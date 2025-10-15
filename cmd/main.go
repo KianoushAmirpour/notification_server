@@ -41,7 +41,7 @@ func main() {
 
 	iplimiter := adapters.NewIpLimiter()
 	UserRepo := postgres.NewPostgresPoolUserRepo(pool)
-	svc := service.NewUserRegisterService(UserRepo, bcryptHasher, mailer, otpService)
+	svc := service.NewUserRegisterService(UserRepo, bcryptHasher, mailer, otpService, pool)
 	h := handler.NewUserHandler(svc, rdb, cfg, iplimiter)
 
 	routerCfg := router.RouterConfig{UserHandler: h}

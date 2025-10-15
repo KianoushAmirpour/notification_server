@@ -4,18 +4,19 @@ import (
 	"context"
 
 	"github.com/KianoushAmirpour/notification_server/internal/domain"
+	"github.com/jackc/pgx/v5"
 )
 
 type UserRepository interface {
 	Create(ctx context.Context, u *domain.User) error
 	DeleteByID(ctx context.Context, id int) error
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)
-	CreateUserStaging(ctx context.Context, u *domain.User) error
-	MoveUserFromStaging(ctx context.Context, email string) error
-	DeleteUserFromStaging(ctx context.Context, email string) error
-	SaveEmailByReqID(ctx context.Context, reqid, email string) error
-	GetEmailByReqID(ctx context.Context, reqid string) (string, error)
-	DeleteUserFromEmailVerification(ctx context.Context, email string) error
+	CreateUserStaging(ctx context.Context, tx pgx.Tx, u *domain.User) error
+	MoveUserFromStaging(ctx context.Context, tx pgx.Tx, email string) error
+	DeleteUserFromStaging(ctx context.Context, tx pgx.Tx, email string) error
+	SaveEmailByReqID(ctx context.Context, tx pgx.Tx, reqid, email string) error
+	GetEmailByReqID(ctx context.Context, tx pgx.Tx, reqid string) (string, error)
+	DeleteUserFromEmailVerification(ctx context.Context, tx pgx.Tx, email string) error
 }
 
 type PasswordHasher interface {

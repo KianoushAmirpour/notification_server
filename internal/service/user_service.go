@@ -10,6 +10,7 @@ import (
 	"github.com/KianoushAmirpour/notification_server/internal/config"
 	"github.com/KianoushAmirpour/notification_server/internal/domain"
 	"github.com/KianoushAmirpour/notification_server/internal/repository"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -18,6 +19,7 @@ type UserRegisterService struct {
 	PasswordHasher repository.PasswordHasher
 	Mailer         repository.Mailer
 	Otp            repository.OTPService
+	DbPool         *pgxpool.Pool
 }
 
 var apiErr *domain.APIError
@@ -26,8 +28,9 @@ func NewUserRegisterService(
 	users repository.UserRepository,
 	passwordhasher repository.PasswordHasher,
 	mailer repository.Mailer,
-	otp repository.OTPService) *UserRegisterService {
-	return &UserRegisterService{Users: users, PasswordHasher: passwordhasher, Mailer: mailer, Otp: otp}
+	otp repository.OTPService,
+	dbpool *pgxpool.Pool) *UserRegisterService {
+	return &UserRegisterService{Users: users, PasswordHasher: passwordhasher, Mailer: mailer, Otp: otp, DbPool: dbpool}
 }
 
 func (s *UserRegisterService) RegisterUser(ctx context.Context, req domain.RegisteredUser, cfg *config.Config, reqid string) (*domain.RegisterResponse, *domain.APIError) {
@@ -46,7 +49,13 @@ func (s *UserRegisterService) RegisterUser(ctx context.Context, req domain.Regis
 		Preferences: req.Preferences,
 	}
 
-	err = s.Users.CreateUserStaging(ctx, user)
+	tx, err := s.DbPool.Begin(ctx)
+	if err != nil {
+		apiErr = domain.NewAPIError(err, http.StatusInternalServerError)
+		return nil, apiErr
+	}
+	defer tx.Rollback(ctx)
+	err = s.Users.CreateUserStaging(ctx, tx, user)
 	if err != nil {
 		apiErr = domain.NewAPIError(err, http.StatusInternalServerError)
 		return nil, apiErr
@@ -70,7 +79,12 @@ func (s *UserRegisterService) RegisterUser(ctx context.Context, req domain.Regis
 		return nil, apiErr
 	}
 
-	err = s.Users.SaveEmailByReqID(ctx, reqid, req.Email)
+	err = s.Users.SaveEmailByReqID(ctx, tx, reqid, req.Email)
+	if err != nil {
+		apiErr = domain.NewAPIError(err, http.StatusInternalServerError)
+		return nil, apiErr
+	}
+	err = tx.Commit(ctx)
 	if err != nil {
 		apiErr = domain.NewAPIError(err, http.StatusInternalServerError)
 		return nil, apiErr
@@ -88,7 +102,13 @@ func (s *UserRegisterService) VerifyUser(ctx context.Context, req domain.Registe
 		return nil, apiErr
 	}
 
-	email, err := s.Users.GetEmailByReqID(ctx, reqid)
+	tx, err := s.DbPool.Begin(ctx)
+	if err != nil {
+		apiErr = domain.NewAPIError(err, http.StatusInternalServerError)
+		return nil, apiErr
+	}
+	defer tx.Rollback(ctx)
+	email, err := s.Users.GetEmailByReqID(ctx, tx, reqid)
 	if err != nil {
 		apiErr = domain.NewAPIError(err, http.StatusInternalServerError)
 		return nil, apiErr
@@ -108,19 +128,25 @@ func (s *UserRegisterService) VerifyUser(ctx context.Context, req domain.Registe
 		}
 
 	}
-	err = s.Users.MoveUserFromStaging(ctx, email)
+	err = s.Users.MoveUserFromStaging(ctx, tx, email)
 	if err != nil {
 		apiErr = domain.NewAPIError(err, http.StatusInternalServerError)
 		return nil, apiErr
 	}
 
-	err = s.Users.DeleteUserFromStaging(ctx, email)
+	err = s.Users.DeleteUserFromStaging(ctx, tx, email)
 	if err != nil {
 		apiErr = domain.NewAPIError(err, http.StatusInternalServerError)
 		return nil, apiErr
 	}
 
-	err = s.Users.DeleteUserFromEmailVerification(ctx, email)
+	err = s.Users.DeleteUserFromEmailVerification(ctx, tx, email)
+	if err != nil {
+		apiErr = domain.NewAPIError(err, http.StatusInternalServerError)
+		return nil, apiErr
+	}
+
+	err = tx.Commit(ctx)
 	if err != nil {
 		apiErr = domain.NewAPIError(err, http.StatusInternalServerError)
 		return nil, apiErr

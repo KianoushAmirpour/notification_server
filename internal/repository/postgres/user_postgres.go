@@ -69,7 +69,7 @@ func (r *PostgresPoolUserRepo) Create(ctx context.Context, u *domain.User) error
 	return nil
 }
 
-func (r *PostgresPoolUserRepo) CreateUserStaging(ctx context.Context, u *domain.User) error {
+func (r *PostgresPoolUserRepo) CreateUserStaging(ctx context.Context, tx pgx.Tx, u *domain.User) error {
 
 	var returnedID int
 
@@ -77,8 +77,8 @@ func (r *PostgresPoolUserRepo) CreateUserStaging(ctx context.Context, u *domain.
 			   (first_name, last_name, email, password, preferences) 
 			   values ($1, $2, $3, $4, $5) returning id
 	`
-
-	row := r.Db.QueryRow(ctx, query, u.FirstName, u.LastName, u.Email, u.Password, u.Preferences)
+	row := tx.QueryRow(ctx, query, u.FirstName, u.LastName, u.Email, u.Password, u.Preferences)
+	// row := r.Db.QueryRow(ctx, query, u.FirstName, u.LastName, u.Email, u.Password, u.Preferences)
 	err := row.Scan(&returnedID)
 	if err != nil {
 		return err
@@ -114,12 +114,12 @@ func (r *PostgresPoolUserRepo) GetByEmail(ctx context.Context, email string) (*d
 	return &u, nil
 }
 
-func (r *PostgresPoolUserRepo) MoveUserFromStaging(ctx context.Context, email string) error {
+func (r *PostgresPoolUserRepo) MoveUserFromStaging(ctx context.Context, tx pgx.Tx, email string) error {
 	query := `Insert into users select * from staging_users where email=$1 returning id`
 
 	var returnedID int
-
-	row := r.Db.QueryRow(ctx, query, email)
+	row := tx.QueryRow(ctx, query, email)
+	// row := r.Db.QueryRow(ctx, query, email)
 	err := row.Scan(&returnedID)
 	if err != nil {
 		return err
@@ -129,12 +129,13 @@ func (r *PostgresPoolUserRepo) MoveUserFromStaging(ctx context.Context, email st
 
 }
 
-func (r *PostgresPoolUserRepo) DeleteUserFromStaging(ctx context.Context, email string) error {
+func (r *PostgresPoolUserRepo) DeleteUserFromStaging(ctx context.Context, tx pgx.Tx, email string) error {
 
 	var returnedID int
 
 	query := `delete from staging_users where email = $1 returning id`
-	row := r.Db.QueryRow(ctx, query, email)
+	row := tx.QueryRow(ctx, query, email)
+	// row := r.Db.QueryRow(ctx, query, email)
 	err := row.Scan(&returnedID)
 	if err != nil {
 		return err
@@ -144,14 +145,14 @@ func (r *PostgresPoolUserRepo) DeleteUserFromStaging(ctx context.Context, email 
 
 }
 
-func (r *PostgresPoolUserRepo) SaveEmailByReqID(ctx context.Context, reqid, email string) error {
+func (r *PostgresPoolUserRepo) SaveEmailByReqID(ctx context.Context, tx pgx.Tx, reqid, email string) error {
 	query := `insert into email_verification 
 			   (request_id, email) 
 			   values ($1, $2) returning id`
 
 	var returnedID int
-
-	row := r.Db.QueryRow(ctx, query, reqid, email)
+	row := tx.QueryRow(ctx, query, reqid, email)
+	// row := r.Db.QueryRow(ctx, query, reqid, email)
 	err := row.Scan(&returnedID)
 	if err != nil {
 		return err
@@ -160,11 +161,12 @@ func (r *PostgresPoolUserRepo) SaveEmailByReqID(ctx context.Context, reqid, emai
 	return nil
 }
 
-func (r *PostgresPoolUserRepo) GetEmailByReqID(ctx context.Context, reqid string) (string, error) {
+func (r *PostgresPoolUserRepo) GetEmailByReqID(ctx context.Context, tx pgx.Tx, reqid string) (string, error) {
 	var e string
 
 	query := `select email from email_verification where request_id=$1`
-	row := r.Db.QueryRow(ctx, query, reqid)
+	row := tx.QueryRow(ctx, query, reqid)
+	// row := r.Db.QueryRow(ctx, query, reqid)
 	err := row.Scan(&e)
 	if err != nil {
 		return "", errors.New("invalid request")
@@ -172,12 +174,13 @@ func (r *PostgresPoolUserRepo) GetEmailByReqID(ctx context.Context, reqid string
 	return e, nil
 }
 
-func (r *PostgresPoolUserRepo) DeleteUserFromEmailVerification(ctx context.Context, email string) error {
+func (r *PostgresPoolUserRepo) DeleteUserFromEmailVerification(ctx context.Context, tx pgx.Tx, email string) error {
 
 	var returnedID int
 
 	query := `delete from email_verification where email = $1 returning id`
-	row := r.Db.QueryRow(ctx, query, email)
+	row := tx.QueryRow(ctx, query, email)
+	// row := r.Db.QueryRow(ctx, query, email)
 	err := row.Scan(&returnedID)
 	if err != nil {
 		return err
