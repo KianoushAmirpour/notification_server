@@ -1,0 +1,170 @@
+package postgres
+
+import (
+	"context"
+	"errors"
+
+	"github.com/KianoushAmirpour/notification_server/internal/domain"
+	"github.com/jackc/pgx/v5"
+)
+
+type PostgresUserRepo struct {
+	Db *pgx.Conn
+}
+
+// type User struct {
+// 	ID          int
+// 	FirstName   string
+// 	LastName    string
+// 	Email       string
+// 	Password    string
+// 	Preferences []string
+// }
+
+func NewPostgresUserRepo(db *pgx.Conn) *PostgresUserRepo {
+	return &PostgresUserRepo{Db: db}
+}
+
+func OpenDatabaseConn(dsn string) (*pgx.Conn, error) {
+	conn, err := pgx.Connect(context.Background(), dsn)
+	if err != nil {
+		return nil, err
+	}
+	return conn, nil
+}
+
+func (r *PostgresUserRepo) Create(ctx context.Context, u *domain.User) error {
+
+	var returnedID int
+
+	query := `insert into users 
+			   (first_name, last_name, email, password, preferences) 
+			   values ($1, $2, $3, $4, $5) returning id
+	`
+
+	row := r.Db.QueryRow(ctx, query, u.FirstName, u.LastName, u.Email, u.Password, u.Preferences)
+	err := row.Scan(&returnedID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *PostgresUserRepo) CreateUserStaging(ctx context.Context, u *domain.User) error {
+
+	var returnedID int
+
+	query := `insert into staging_users 
+			   (first_name, last_name, email, password, preferences) 
+			   values ($1, $2, $3, $4, $5) returning id
+	`
+
+	row := r.Db.QueryRow(ctx, query, u.FirstName, u.LastName, u.Email, u.Password, u.Preferences)
+	err := row.Scan(&returnedID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *PostgresUserRepo) DeleteByID(ctx context.Context, id int) error {
+
+	var returnedID int
+
+	query := `delete from users where id = $1 returning id`
+	row := r.Db.QueryRow(ctx, query, id)
+	err := row.Scan(&returnedID)
+	if err != nil {
+		return errors.New("user not found")
+	}
+
+	return nil
+
+}
+
+func (r *PostgresUserRepo) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
+	var u domain.User
+
+	query := `select id, first_name, last_name, email, password, preferences from users where email=$1`
+	row := r.Db.QueryRow(ctx, query, email)
+	err := row.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.Password, &u.Preferences)
+	if err != nil {
+		return nil, errors.New("user not found")
+	}
+	return &u, nil
+}
+
+func (r *PostgresUserRepo) MoveUserFromStaging(ctx context.Context, email string) error {
+	query := `Insert into users select * from staging_users where email=$1 returning id`
+
+	var returnedID int
+
+	row := r.Db.QueryRow(ctx, query, email)
+	err := row.Scan(&returnedID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+func (r *PostgresUserRepo) DeleteUserFromStaging(ctx context.Context, email string) error {
+
+	var returnedID int
+
+	query := `delete from staging_users where email = $1 returning id`
+	row := r.Db.QueryRow(ctx, query, email)
+	err := row.Scan(&returnedID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+func (r *PostgresUserRepo) SaveEmailByReqID(ctx context.Context, reqid, email string) error {
+	query := `insert into email_verification 
+			   (request_id, email) 
+			   values ($1, $2) returning id`
+
+	var returnedID int
+
+	row := r.Db.QueryRow(ctx, query, reqid, email)
+	err := row.Scan(&returnedID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (r *PostgresUserRepo) GetEmailByReqID(ctx context.Context, reqid string) (string, error) {
+	var e string
+
+	query := `select email from email_verification where request_id=$1`
+	row := r.Db.QueryRow(ctx, query, reqid)
+	err := row.Scan(&e)
+	if err != nil {
+		return "", errors.New("invalid request")
+	}
+	return e, nil
+}
+
+func (r *PostgresUserRepo) DeleteUserFromEmailVerification(ctx context.Context, email string) error {
+
+	var returnedID int
+
+	query := `delete from email_verification where email = $1 returning id`
+	row := r.Db.QueryRow(ctx, query, email)
+	err := row.Scan(&returnedID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
