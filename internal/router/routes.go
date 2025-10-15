@@ -37,7 +37,7 @@ func SetupRoutes(config RouterConfig) *gin.Engine {
 
 		api.Handle("POST", "/users/register", middelware.RegisterMiddelware[domain.RegisteredUser](), middelware.AddCorrelationID(), config.UserHandler.RegisterHandler)
 		api.Handle("POST", "/users/verify", middelware.RegisterMiddelware[domain.RegisterVerify](), config.UserHandler.VerificationHandler)
-		api.Handle("POST", "/api/login", middelware.RegisterMiddelware[domain.LoginUser](), config.UserHandler.LoginHandler)
+		api.Handle("POST", "/users/login", middelware.RegisterMiddelware[domain.LoginUser](), config.UserHandler.LoginHandler)
 	}
 
 	g.Handle("GET", "/api/home", config.UserHandler.HomePageHandler)

@@ -21,10 +21,10 @@ type Config struct {
 	OTPLength         int     `mapstructure:"OTP_LENGTH" validate:"required,gte=0"`
 	OTPExpiration     int     `mapstructure:"EXPIRATION" validate:"required,gte=0"`
 	BcryptCost        int     `mapstructure:"BCRYPT_COST" validate:"required,gte=0"`
-	GemeniModel       string  `mapstructure:"GEMENI_MODEL" validate:"required"`
-	NumOfImages       int     `mapstructure:"NUMBER_OF_IMAGES" validate:"required,gte=0,lte=2"`
-	AspectRatio       string  `mapstructure:"NUMBER_OF_IMAGES" validate:"required"`
-	GemeniAPI         string  `mapstructure:"NUMBER_OF_IMAGES" validate:"required"`
+	// GemeniModel       string  `mapstructure:"GEMENI_MODEL" validate:"required"`
+	// NumOfImages       int     `mapstructure:"NUMBER_OF_IMAGES" validate:"required,gte=0,lte=2"`
+	// AspectRatio       string  `mapstructure:"NUMBER_OF_IMAGES" validate:"required"`
+	// GemeniAPI         string  `mapstructure:"NUMBER_OF_IMAGES" validate:"required"`
 }
 
 func LoadConfigs(path string) (*Config, error) {

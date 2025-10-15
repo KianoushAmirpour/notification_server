@@ -6,10 +6,15 @@ import (
 
 	"github.com/KianoushAmirpour/notification_server/internal/domain"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 )
 
 type PostgresUserRepo struct {
 	Db *pgx.Conn
+}
+
+type PostgresPoolUserRepo struct {
+	Db *pgxpool.Pool
 }
 
 // type User struct {
@@ -25,6 +30,19 @@ func NewPostgresUserRepo(db *pgx.Conn) *PostgresUserRepo {
 	return &PostgresUserRepo{Db: db}
 }
 
+func NewPostgresPoolUserRepo(db *pgxpool.Pool) *PostgresPoolUserRepo {
+	return &PostgresPoolUserRepo{db}
+}
+
+func OpenDatabaseConnPool(dsn string) (*pgxpool.Pool, error) {
+	pool, err := pgxpool.New(context.Background(), dsn)
+	if err != nil {
+		return nil, err
+	}
+	return pool, nil
+
+}
+
 func OpenDatabaseConn(dsn string) (*pgx.Conn, error) {
 	conn, err := pgx.Connect(context.Background(), dsn)
 	if err != nil {
@@ -33,7 +51,7 @@ func OpenDatabaseConn(dsn string) (*pgx.Conn, error) {
 	return conn, nil
 }
 
-func (r *PostgresUserRepo) Create(ctx context.Context, u *domain.User) error {
+func (r *PostgresPoolUserRepo) Create(ctx context.Context, u *domain.User) error {
 
 	var returnedID int
 
@@ -51,7 +69,7 @@ func (r *PostgresUserRepo) Create(ctx context.Context, u *domain.User) error {
 	return nil
 }
 
-func (r *PostgresUserRepo) CreateUserStaging(ctx context.Context, u *domain.User) error {
+func (r *PostgresPoolUserRepo) CreateUserStaging(ctx context.Context, u *domain.User) error {
 
 	var returnedID int
 
@@ -69,7 +87,7 @@ func (r *PostgresUserRepo) CreateUserStaging(ctx context.Context, u *domain.User
 	return nil
 }
 
-func (r *PostgresUserRepo) DeleteByID(ctx context.Context, id int) error {
+func (r *PostgresPoolUserRepo) DeleteByID(ctx context.Context, id int) error {
 
 	var returnedID int
 
@@ -84,7 +102,7 @@ func (r *PostgresUserRepo) DeleteByID(ctx context.Context, id int) error {
 
 }
 
-func (r *PostgresUserRepo) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
+func (r *PostgresPoolUserRepo) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
 	var u domain.User
 
 	query := `select id, first_name, last_name, email, password, preferences from users where email=$1`
@@ -96,7 +114,7 @@ func (r *PostgresUserRepo) GetByEmail(ctx context.Context, email string) (*domai
 	return &u, nil
 }
 
-func (r *PostgresUserRepo) MoveUserFromStaging(ctx context.Context, email string) error {
+func (r *PostgresPoolUserRepo) MoveUserFromStaging(ctx context.Context, email string) error {
 	query := `Insert into users select * from staging_users where email=$1 returning id`
 
 	var returnedID int
@@ -111,7 +129,7 @@ func (r *PostgresUserRepo) MoveUserFromStaging(ctx context.Context, email string
 
 }
 
-func (r *PostgresUserRepo) DeleteUserFromStaging(ctx context.Context, email string) error {
+func (r *PostgresPoolUserRepo) DeleteUserFromStaging(ctx context.Context, email string) error {
 
 	var returnedID int
 
@@ -126,7 +144,7 @@ func (r *PostgresUserRepo) DeleteUserFromStaging(ctx context.Context, email stri
 
 }
 
-func (r *PostgresUserRepo) SaveEmailByReqID(ctx context.Context, reqid, email string) error {
+func (r *PostgresPoolUserRepo) SaveEmailByReqID(ctx context.Context, reqid, email string) error {
 	query := `insert into email_verification 
 			   (request_id, email) 
 			   values ($1, $2) returning id`
@@ -142,7 +160,7 @@ func (r *PostgresUserRepo) SaveEmailByReqID(ctx context.Context, reqid, email st
 	return nil
 }
 
-func (r *PostgresUserRepo) GetEmailByReqID(ctx context.Context, reqid string) (string, error) {
+func (r *PostgresPoolUserRepo) GetEmailByReqID(ctx context.Context, reqid string) (string, error) {
 	var e string
 
 	query := `select email from email_verification where request_id=$1`
@@ -154,7 +172,7 @@ func (r *PostgresUserRepo) GetEmailByReqID(ctx context.Context, reqid string) (s
 	return e, nil
 }
 
-func (r *PostgresUserRepo) DeleteUserFromEmailVerification(ctx context.Context, email string) error {
+func (r *PostgresPoolUserRepo) DeleteUserFromEmailVerification(ctx context.Context, email string) error {
 
 	var returnedID int
 

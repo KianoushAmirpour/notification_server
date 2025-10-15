@@ -19,7 +19,12 @@ func main() {
 		panic(err)
 	}
 
-	conn, err := postgres.OpenDatabaseConn(cfg.DatabaseDSN)
+	// conn, err := postgres.OpenDatabaseConn(cfg.DatabaseDSN)
+	// if err != nil {
+	// 	panic(err)
+	// }
+
+	pool, err := postgres.OpenDatabaseConnPool(cfg.DatabaseDSN)
 	if err != nil {
 		panic(err)
 	}
@@ -35,7 +40,7 @@ func main() {
 	mailer := adapters.Mailer{Host: cfg.SmtpHost, Port: cfg.SmtpPort, Username: cfg.SmtpUsername, Password: cfg.SmtpPassword}
 
 	iplimiter := adapters.NewIpLimiter()
-	UserRepo := postgres.NewPostgresUserRepo(conn)
+	UserRepo := postgres.NewPostgresPoolUserRepo(pool)
 	svc := service.NewUserRegisterService(UserRepo, bcryptHasher, mailer, otpService)
 	h := handler.NewUserHandler(svc, rdb, cfg, iplimiter)
 
