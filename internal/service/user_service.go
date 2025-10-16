@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
 
 	"github.com/KianoushAmirpour/notification_server/internal/adapters"
@@ -14,6 +13,7 @@ import (
 	"github.com/KianoushAmirpour/notification_server/internal/repository"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"golang.org/x/crypto/bcrypt"
+	"golang.org/x/sync/errgroup"
 )
 
 type UserRegisterService struct {
@@ -74,10 +74,6 @@ func (s *UserRegisterService) RegisterUser(ctx context.Context, req domain.Regis
 		return nil, apiErr
 	}
 
-	errChan := make(chan *domain.APIError, 2)
-	var wg sync.WaitGroup
-	wg.Add(2)
-
 	otp, err := adapters.GenerateOTP(cfg.OTPLength)
 	if err != nil {
 		apiErr = domain.NewAPIError(err, http.StatusInternalServerError)
@@ -87,42 +83,19 @@ func (s *UserRegisterService) RegisterUser(ctx context.Context, req domain.Regis
 	timeoutCtx, cancelFunc := context.WithTimeout(context.Background(), time.Duration(5*time.Second))
 	defer cancelFunc()
 
-	go func() {
-		defer wg.Done()
-		saveErr := s.Otp.SaveOTP(timeoutCtx, req.Email, otp, cfg.OTPExpiration)
-		if err != nil {
-			// apiErr = domain.NewAPIError(err, http.StatusInternalServerError)
-			errChan <- domain.NewAPIError(saveErr, http.StatusInternalServerError)
-			// return nil, apiErr
-		}
+	eg, _ := errgroup.WithContext(context.Background())
 
-	}()
+	eg.Go(func() error {
+		return s.Otp.SaveOTP(timeoutCtx, req.Email, otp, cfg.OTPExpiration)
+	})
 
-	go func() {
-		defer wg.Done()
-		SendErr := s.Mailer.SendVerification(req.Email, otp)
-		if err != nil {
-			// apiErr = domain.NewAPIError(err, http.StatusInternalServerError)
-			errChan <- domain.NewAPIError(SendErr, http.StatusInternalServerError)
-			// return nil, apiErr
-		}
+	eg.Go(func() error {
+		return s.Mailer.SendVerification(req.Email, otp)
+	})
 
-	}()
-
-	go func() {
-		wg.Wait()
-		close(errChan)
-	}()
-
-	var firstErr *domain.APIError
-	for e := range errChan {
-		if firstErr == nil {
-			firstErr = e
-		}
-	}
-
-	if firstErr != nil {
-		return nil, firstErr
+	err = eg.Wait()
+	if err != nil {
+		return nil, domain.NewAPIError(err, http.StatusInternalServerError)
 	}
 
 	return &domain.RegisterResponse{Message: "The verification code was sent to your email. Please check your email"}, nil
