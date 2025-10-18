@@ -9,18 +9,17 @@ import (
 	"github.com/KianoushAmirpour/notification_server/internal/domain"
 	"github.com/KianoushAmirpour/notification_server/internal/service"
 	"github.com/gin-gonic/gin"
-	"github.com/redis/go-redis/v9"
 )
 
 type UserHandler struct {
 	UserSvc       *service.UserRegisterService
-	ImageSvc      *service.ImageGenerationService
+	ImageSvc      *service.StoryGenerationService
 	Config        *config.Config
 	IpRateLimiter *adapters.IPRateLimiter
 }
 
-func NewUserHandler(usersvc *service.UserRegisterService, r *redis.Client, c *config.Config, i *adapters.IPRateLimiter) *UserHandler {
-	return &UserHandler{UserSvc: usersvc, Config: c, IpRateLimiter: i}
+func NewUserHandler(usersvc *service.UserRegisterService, imgsvc *service.StoryGenerationService, c *config.Config, i *adapters.IPRateLimiter) *UserHandler {
+	return &UserHandler{UserSvc: usersvc, ImageSvc: imgsvc, Config: c, IpRateLimiter: i}
 }
 
 func (h *UserHandler) HomePageHandler(c *gin.Context) {
@@ -86,14 +85,15 @@ func (h *UserHandler) DeleteUserHandler(c *gin.Context) {
 
 }
 
-// func (h *UserHandler) ImageGenerationHandler(c *gin.Context) {
+func (h *UserHandler) ImageGenerationHandler(c *gin.Context) {
 
-// 	resp, err := h.ImageSvc.GenerateImage(c.Request.Context())
-// 	if err != nil {
-// 		c.JSON(err.StatusCode, gin.H{"Message": err.Message})
-// 		return
-// 	}
+	userID := c.GetInt("user_id")
+	resp, err := h.ImageSvc.GenerateStory(c.Request.Context(), userID)
+	if err != nil {
+		c.JSON(err.StatusCode, gin.H{"Message": err.Message})
+		return
+	}
 
-// 	c.JSON(http.StatusCreated, gin.H{"Message": ""})
+	c.JSON(http.StatusCreated, gin.H{"Message": resp.Message})
 
-// }
+}

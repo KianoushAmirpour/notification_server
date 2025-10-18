@@ -1,12 +1,10 @@
 -- +goose Up
 -- +goose StatementBegin
-CREATE TABLE IF NOT EXISTS images (
+CREATE TABLE IF NOT EXISTS stories (
     id SERIAL PRIMARY KEY,
     file_name VARCHAR(255) NOT NULL,
     user_id INT NOT NULL,
     url TEXT NOT NULL UNIQUE,
-    ratio VARCHAR(50) NOT NULL,
-    size INT NOT NULL,
     status VARCHAR(50) NOT NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -18,5 +16,5 @@ CREATE TABLE IF NOT EXISTS images (
 
 -- +goose Down
 -- +goose StatementBegin
-DROP TABLE images;
+DROP TABLE stories;
 -- +goose StatementEnd

@@ -13,6 +13,7 @@ import (
 	"github.com/KianoushAmirpour/notification_server/internal/adapters"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
+	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
 
@@ -28,11 +29,14 @@ func AuthenticateMiddleware(secretKey []byte) gin.HandlerFunc {
 			return
 		}
 		tokenString := parts[1]
-		_, err := adapters.VerifyJWTToken(tokenString, secretKey)
+		token, err := adapters.VerifyJWTToken(tokenString, secretKey)
 		if err != nil {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
 
 		}
+		claims := token.Claims.(jwt.MapClaims)
+		user_id := claims["user_id"].(float64)
+		c.Set("user_id", int(user_id))
 		c.Next()
 	}
 }

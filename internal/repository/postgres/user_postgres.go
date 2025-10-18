@@ -102,6 +102,19 @@ func (r *PostgresPoolUserRepo) DeleteByID(ctx context.Context, id int) error {
 
 }
 
+func (r *PostgresPoolUserRepo) GetUserByID(ctx context.Context, id int) (*domain.User, error) {
+	var u domain.User
+
+	query := `select id, first_name, last_name, email, preferences from users where id=$1`
+	row := r.Db.QueryRow(ctx, query, id)
+	err := row.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.Preferences)
+	if err != nil {
+		return nil, errors.New("user not found")
+	}
+	return &u, nil
+
+}
+
 func (r *PostgresPoolUserRepo) GetByEmail(ctx context.Context, email string) (*domain.User, error) {
 	var u domain.User
 

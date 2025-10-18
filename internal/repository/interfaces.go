@@ -5,10 +5,12 @@ import (
 
 	"github.com/KianoushAmirpour/notification_server/internal/domain"
 	"github.com/jackc/pgx/v5"
+	"google.golang.org/genai"
 )
 
 type UserRepository interface {
 	Create(ctx context.Context, u *domain.User) error
+	GetUserByID(ctx context.Context, id int) (*domain.User, error)
 	DeleteByID(ctx context.Context, id int) error
 	GetByEmail(ctx context.Context, email string) (*domain.User, error)
 	CreateUserStaging(ctx context.Context, tx pgx.Tx, u *domain.User) error
@@ -33,5 +35,5 @@ type Mailer interface {
 }
 
 type ImageGeneration interface {
-	GenerateImage(ctx context.Context)
+	GenerateStory(ctx context.Context, preferences []string) (*genai.GenerateContentResponse, error)
 }

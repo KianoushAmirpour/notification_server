@@ -1,7 +1,9 @@
-package adapters
+package ai
 
 import (
 	"context"
+	"fmt"
+	"log"
 
 	"github.com/KianoushAmirpour/notification_server/internal/config"
 	"github.com/KianoushAmirpour/notification_server/internal/domain"
@@ -13,20 +15,31 @@ type GemeniClient struct {
 	Cfg    *config.Config
 }
 
-func NewGemeniClient(client *genai.Client, cfg *config.Config) *GemeniClient {
+func NewGemeniClient(ctx context.Context, cfg *config.Config) *GemeniClient {
+	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: cfg.GemeniAPI})
+	if err != nil {
+		log.Fatal(err)
+	}
 	return &GemeniClient{Client: client, Cfg: cfg}
 }
 
-func (g GemeniClient) GenerateImages(ctx context.Context, cfg *config.Config) (*genai.GenerateImagesResponse, error) {
-	resp, err := g.Client.Models.GenerateImages(
-		ctx, cfg.GemeniModel,
-		domain.ImageGenerationPrompt,
-		&genai.GenerateImagesConfig{NumberOfImages: int32(g.Cfg.NumOfImages), AspectRatio: g.Cfg.AspectRatio})
+func (g GemeniClient) GenerateStory(ctx context.Context, preferences []string) (*genai.GenerateContentResponse, error) {
+	// resp, err := g.Client.Models.GenerateImages(
+	// 	ctx,
+	// 	g.Cfg.GemeniModel,
+	// 	fmt.Sprintf("Create a picture about %s with %s", preferences, domain.ImageGenerationPrompt),
+	// 	&genai.GenerateImagesConfig{NumberOfImages: int32(numofimages), AspectRatio: ratio})
+
+	result, err := g.Client.Models.GenerateContent(
+		ctx,
+		g.Cfg.GemeniModel,
+		genai.Text(fmt.Sprintf("Create a story about %s with %s", preferences, domain.StoryGenerationThemePrompt)),
+		nil)
 
 	if err != nil {
 		return nil, err
 	}
 
-	return resp, nil
+	return result, nil
 
 }

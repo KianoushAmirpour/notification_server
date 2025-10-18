@@ -1,9 +1,11 @@
 package main
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/KianoushAmirpour/notification_server/internal/adapters"
+	"github.com/KianoushAmirpour/notification_server/internal/adapters/ai"
 	"github.com/KianoushAmirpour/notification_server/internal/config"
 	"github.com/KianoushAmirpour/notification_server/internal/handler"
 	"github.com/KianoushAmirpour/notification_server/internal/repository/postgres"
@@ -42,7 +44,11 @@ func main() {
 	iplimiter := adapters.NewIpLimiter()
 	UserRepo := postgres.NewPostgresPoolUserRepo(pool)
 	svc := service.NewUserRegisterService(UserRepo, bcryptHasher, mailer, otpService, pool)
-	h := handler.NewUserHandler(svc, rdb, cfg, iplimiter)
+
+	imagerepo := ai.NewGemeniClient(context.Background(), cfg)
+	imgsvd := service.NewStoryGenerationService(UserRepo, imagerepo)
+
+	h := handler.NewUserHandler(svc, imgsvd, cfg, iplimiter)
 
 	routerCfg := router.RouterConfig{UserHandler: h}
 
