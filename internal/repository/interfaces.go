@@ -5,7 +5,6 @@ import (
 
 	"github.com/KianoushAmirpour/notification_server/internal/domain"
 	"github.com/jackc/pgx/v5"
-	"google.golang.org/genai"
 )
 
 type UserRepository interface {
@@ -19,6 +18,8 @@ type UserRepository interface {
 	SaveEmailByReqID(ctx context.Context, tx pgx.Tx, reqid, email string) error
 	GetEmailByReqID(ctx context.Context, tx pgx.Tx, reqid string) (string, error)
 	DeleteUserFromEmailVerification(ctx context.Context, tx pgx.Tx, email string) error
+	SaveStoryMetaData(ctx context.Context, i *domain.Story) error
+	Upload(ctx context.Context, story *domain.UploadStory) error
 }
 
 type PasswordHasher interface {
@@ -34,6 +35,16 @@ type Mailer interface {
 	SendVerification(email string, otp int) error
 }
 
-type ImageGeneration interface {
-	GenerateStory(ctx context.Context, preferences []string) (*genai.GenerateContentResponse, error)
+type Job interface {
+	Run(ctx context.Context) (context.Context, error)
+}
+
+type WorkerPool interface {
+	Submit(job Job)
+	Start(resultchan chan string)
+	Stop()
+}
+
+type StoryRepository interface {
+	Upload(ctx context.Context, story *domain.UploadStory) error
 }

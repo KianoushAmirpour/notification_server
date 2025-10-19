@@ -6,7 +6,6 @@ import (
 	"log"
 
 	"github.com/KianoushAmirpour/notification_server/internal/config"
-	"github.com/KianoushAmirpour/notification_server/internal/domain"
 	"google.golang.org/genai"
 )
 
@@ -23,23 +22,18 @@ func NewGemeniClient(ctx context.Context, cfg *config.Config) *GemeniClient {
 	return &GemeniClient{Client: client, Cfg: cfg}
 }
 
-func (g GemeniClient) GenerateStory(ctx context.Context, preferences []string) (*genai.GenerateContentResponse, error) {
-	// resp, err := g.Client.Models.GenerateImages(
-	// 	ctx,
-	// 	g.Cfg.GemeniModel,
-	// 	fmt.Sprintf("Create a picture about %s with %s", preferences, domain.ImageGenerationPrompt),
-	// 	&genai.GenerateImagesConfig{NumberOfImages: int32(numofimages), AspectRatio: ratio})
+func (g GemeniClient) GenerateStory(ctx context.Context, preferences string) (string, error) {
 
 	result, err := g.Client.Models.GenerateContent(
 		ctx,
 		g.Cfg.GemeniModel,
-		genai.Text(fmt.Sprintf("Create a story about %s with %s", preferences, domain.StoryGenerationThemePrompt)),
+		genai.Text(fmt.Sprintf("Create a story about %s with fancey theme", preferences)),
 		nil)
 
 	if err != nil {
-		return nil, err
+		return "", err
 	}
 
-	return result, nil
+	return result.Text(), nil
 
 }

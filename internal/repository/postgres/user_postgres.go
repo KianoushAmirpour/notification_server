@@ -202,3 +202,40 @@ func (r *PostgresPoolUserRepo) DeleteUserFromEmailVerification(ctx context.Conte
 	return nil
 
 }
+
+func (r *PostgresPoolUserRepo) SaveStoryMetaData(ctx context.Context, i *domain.Story) error {
+	query := `
+	 insert into stories
+	 (file_name, user_id, story, status)
+	 values ($1, $2, $3, $4) returning id
+	`
+	var returnedID int
+
+	row := r.Db.QueryRow(ctx, query, i.FileName, i.UserID, i.Story, i.Status)
+	err := row.Scan(&returnedID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+
+}
+
+func (r *PostgresPoolUserRepo) Upload(ctx context.Context, story *domain.UploadStory) error {
+
+	query := `UPDATE stories
+			SET 
+				story = $1,
+				updated_at = NOW(),
+				status='completed'
+			WHERE user_id = $2 RETURNING id;
+	`
+	var returnedID int
+	row := r.Db.QueryRow(ctx, query, story.Story, story.UserID)
+	err := row.Scan(&returnedID)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}

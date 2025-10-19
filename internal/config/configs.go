@@ -23,6 +23,8 @@ type Config struct {
 	BcryptCost        int     `mapstructure:"BCRYPT_COST" validate:"required,gte=0"`
 	GemeniModel       string  `mapstructure:"GEMENI_MODEL" validate:"required"`
 	GemeniAPI         string  `mapstructure:"GEMENI_API" validate:"required"`
+	WorkerCounts      int     `mapstructure:"NUM_WORKERS" validate:"required"`
+	JobQueueSize      int     `mapstructure:"JOB_QUEUE_SIZE" validate:"required"`
 }
 
 func LoadConfigs(path string) (*Config, error) {

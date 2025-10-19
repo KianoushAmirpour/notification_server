@@ -26,34 +26,60 @@ func main() {
 	// 	panic(err)
 	// }
 
-	pool, err := postgres.OpenDatabaseConnPool(cfg.DatabaseDSN)
+	dbPool, err := postgres.OpenDatabaseConnPool(cfg.DatabaseDSN)
 	if err != nil {
 		panic(err)
 	}
 
-	rdb, err := redis.ConnectToRedis(fmt.Sprintf("localhost:%d", cfg.RedisPort), cfg.RedisDB)
+	redisConn, err := redis.ConnectToRedis(fmt.Sprintf("localhost:%d", cfg.RedisPort), cfg.RedisDB)
 	if err != nil {
 		panic(err)
 	}
-	defer rdb.Close()
-	otpService := redis.NewRedisClient(rdb)
+	defer redisConn.Close()
+
+	otpService := redis.NewRedisClient(redisConn)
 
 	bcryptHasher := adapters.Hasher{Cost: cfg.BcryptCost}
+
 	mailer := adapters.Mailer{Host: cfg.SmtpHost, Port: cfg.SmtpPort, Username: cfg.SmtpUsername, Password: cfg.SmtpPassword}
 
 	iplimiter := adapters.NewIpLimiter()
-	UserRepo := postgres.NewPostgresPoolUserRepo(pool)
-	svc := service.NewUserRegisterService(UserRepo, bcryptHasher, mailer, otpService, pool)
 
-	imagerepo := ai.NewGemeniClient(context.Background(), cfg)
-	imgsvd := service.NewStoryGenerationService(UserRepo, imagerepo)
+	UserRepo := postgres.NewPostgresPoolUserRepo(dbPool)
 
-	h := handler.NewUserHandler(svc, imgsvd, cfg, iplimiter)
+	userRegisterSvc := service.NewUserRegisterService(UserRepo, bcryptHasher, mailer, otpService, dbPool)
+
+	gemeniClient := ai.NewGemeniClient(context.Background(), cfg)
+
+	workerPool := adapters.NewWorkerPool(cfg.WorkerCounts, cfg.JobQueueSize)
+	resultchan := make(chan string, 10)
+	workerPool.Start(resultchan)
+	storyGenerationSvc := service.NewStoryGenerationService(UserRepo, gemeniClient, workerPool)
+
+	h := handler.NewUserHandler(userRegisterSvc, storyGenerationSvc, cfg, iplimiter)
 
 	routerCfg := router.RouterConfig{UserHandler: h}
 
 	g := router.SetupRoutes(routerCfg)
 
+	go func() {
+		for userEmail := range resultchan {
+			fmt.Println(userEmail)
+			err = mailer.SendNotification(userEmail)
+			if err != nil {
+				panic(err)
+			}
+		}
+	}()
+
+	go func() {
+		workerPool.Wg.Wait()
+	}()
+
 	g.Run(fmt.Sprintf(":%d", cfg.ServerPort))
+
+	close(resultchan)
+	workerPool.CancelFunc()
+	close(workerPool.JobQueue)
 
 }

@@ -28,7 +28,7 @@ func SetupRoutes(config RouterConfig) *gin.Engine {
 	protectedGroup := g.Group("/api", middelware.AuthenticateMiddleware([]byte(config.UserHandler.Config.JwtSecret)))
 	{
 		protectedGroup.Handle("DELETE", "/users", middelware.CheckContentType(), middelware.RegisterMiddelware[domain.User](), config.UserHandler.DeleteUserHandler)
-		protectedGroup.Handle("POST", "/images/generate", middelware.RateLimiterMiddelware(config.UserHandler.IpRateLimiter,
+		protectedGroup.Handle("POST", "/stories/generate", middelware.RateLimiterMiddelware(config.UserHandler.IpRateLimiter,
 			config.UserHandler.Config.RataLimitCapacity, config.UserHandler.Config.RataLimitFillRate),
 			config.UserHandler.ImageGenerationHandler)
 	}
