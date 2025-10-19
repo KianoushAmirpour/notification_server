@@ -7,15 +7,16 @@ import (
 )
 
 type Mailer struct {
-	Host     string
-	Port     int
-	Username string
-	Password string
+	Host      string
+	Port      int
+	Username  string
+	Password  string
+	FromEmail string
 }
 
 func (m Mailer) SendVerification(email string, otp int) error {
 	message := gomail.NewMessage()
-	message.SetHeader("From", "youremail@email.com")
+	message.SetHeader("From", m.FromEmail)
 	message.SetHeader("To", email)
 	message.SetHeader("Subject", "verificatoin code")
 
@@ -34,7 +35,7 @@ func (m Mailer) SendVerification(email string, otp int) error {
 
 func (m Mailer) SendNotification(email string) error {
 	message := gomail.NewMessage()
-	message.SetHeader("From", "youremail@email.com")
+	message.SetHeader("From", m.FromEmail)
 	message.SetHeader("To", email)
 	message.SetHeader("Subject", "Notification")
 

@@ -1,16 +1,27 @@
 package adapters
 
 import (
+	"fmt"
 	"time"
 
+	"github.com/KianoushAmirpour/notification_server/internal/domain"
 	"github.com/golang-jwt/jwt/v5"
 )
 
-func CreateJWTToken(id int, secret []byte) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
-		"user_id": id,
-		"exp":     time.Now().Add(time.Hour).Unix(),
-	})
+func CreateJWTToken(id int, email string, secret []byte, issuer string) (string, error) {
+
+	accessTokenClaims := domain.CustomClaims{
+		UserID: id,
+		Email:  email,
+		RegisteredClaims: jwt.RegisteredClaims{
+			Issuer:    issuer,
+			Subject:   "access-token",
+			ExpiresAt: jwt.NewNumericDate((time.Now().Add(time.Hour))),
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, accessTokenClaims)
 
 	tokenString, err := token.SignedString(secret)
 	if err != nil {
@@ -21,18 +32,19 @@ func CreateJWTToken(id int, secret []byte) (string, error) {
 
 }
 
-func VerifyJWTToken(tokenString string, secretKey []byte) (*jwt.Token, error) {
-	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+func VerifyJWTToken(tokenString string, secretKey []byte) (*domain.CustomClaims, error) {
+	token, err := jwt.ParseWithClaims(tokenString, &domain.CustomClaims{}, func(token *jwt.Token) (interface{}, error) {
 		return secretKey, nil
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to parse token: %w", err)
 	}
 
-	if !token.Valid {
+	claims, ok := token.Claims.(*domain.CustomClaims)
+	if !token.Valid || !ok {
 		return nil, jwt.ErrInvalidKey
 	}
 
-	return token, nil
+	return claims, nil
 }

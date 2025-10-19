@@ -181,7 +181,7 @@ func (s *UserRegisterService) AuthenticateUser(ctx context.Context, req domain.L
 		return nil, apiErr
 	}
 
-	token, err := adapters.CreateJWTToken(u.ID, []byte(cfg.JwtSecret))
+	token, err := adapters.CreateJWTToken(u.ID, u.Email, []byte(cfg.JwtSecret), cfg.JwtISS)
 	if err != nil {
 		apiErr = domain.NewAPIError(err, http.StatusInternalServerError)
 		return nil, apiErr

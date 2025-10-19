@@ -41,7 +41,12 @@ func main() {
 
 	bcryptHasher := adapters.Hasher{Cost: cfg.BcryptCost}
 
-	mailer := adapters.Mailer{Host: cfg.SmtpHost, Port: cfg.SmtpPort, Username: cfg.SmtpUsername, Password: cfg.SmtpPassword}
+	mailer := adapters.Mailer{
+		Host:      cfg.SmtpHost,
+		Port:      cfg.SmtpPort,
+		Username:  cfg.SmtpUsername,
+		Password:  cfg.SmtpPassword,
+		FromEmail: cfg.FromEmail}
 
 	iplimiter := adapters.NewIpLimiter()
 

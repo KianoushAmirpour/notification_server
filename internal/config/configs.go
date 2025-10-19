@@ -25,6 +25,9 @@ type Config struct {
 	GemeniAPI         string  `mapstructure:"GEMENI_API" validate:"required"`
 	WorkerCounts      int     `mapstructure:"NUM_WORKERS" validate:"required"`
 	JobQueueSize      int     `mapstructure:"JOB_QUEUE_SIZE" validate:"required"`
+	MaxAllowedSize    int     `mapstructure:"JSON_BODY_MAX_SIZE" validate:"required,gte=0"`
+	FromEmail         string  `mapstructure:"FROM_EMAIL" validate:"required"`
+	JwtISS            string  `mapstructure:"ISS" validate:"required"`
 }
 
 func LoadConfigs(path string) (*Config, error) {

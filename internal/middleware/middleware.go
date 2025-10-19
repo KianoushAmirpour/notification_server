@@ -1,4 +1,4 @@
-package middelware
+package middleware
 
 import (
 	"encoding/json"
@@ -13,11 +13,8 @@ import (
 	"github.com/KianoushAmirpour/notification_server/internal/adapters"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
-	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 )
-
-const MaxAllowedSize = 1024
 
 func AuthenticateMiddleware(secretKey []byte) gin.HandlerFunc {
 	return func(c *gin.Context) {
@@ -34,8 +31,7 @@ func AuthenticateMiddleware(secretKey []byte) gin.HandlerFunc {
 			c.AbortWithStatusJSON(http.StatusUnauthorized, gin.H{"error": "Invalid or expired token"})
 
 		}
-		claims := token.Claims.(jwt.MapClaims)
-		user_id := claims["user_id"].(float64)
+		user_id := token.UserID
 		c.Set("user_id", int(user_id))
 		c.Next()
 	}
@@ -83,10 +79,10 @@ func CheckContentType() gin.HandlerFunc {
 	}
 }
 
-func RegisterMiddelware[T any]() gin.HandlerFunc {
+func RegisterMiddelware[T any](maxsize int) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
-		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, int64(MaxAllowedSize))
+		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, int64(maxsize))
 
 		var u T
 
@@ -108,7 +104,7 @@ func RegisterMiddelware[T any]() gin.HandlerFunc {
 				return
 
 			case err.Error() == "http: request body too large":
-				c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, gin.H{"error": fmt.Sprintf("body must not be larger than %d bytes", MaxAllowedSize)})
+				c.AbortWithStatusJSON(http.StatusRequestEntityTooLarge, gin.H{"error": fmt.Sprintf("body must not be larger than %d bytes", maxsize)})
 				return
 
 			case errors.As(err, &syntanxErr):
