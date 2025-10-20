@@ -43,6 +43,7 @@ func SetupRoutes(config RouterConfig) *gin.Engine {
 	}
 
 	g.Handle("GET", "/api/home", config.UserHandler.HomePageHandler)
+	g.Handle("GET", "/api/health", config.UserHandler.HealthHandler)
 
 	return g
 

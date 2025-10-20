@@ -1,8 +1,12 @@
 package handler
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	_ "net/http/pprof"
+	"runtime"
+	"time"
 
 	"github.com/KianoushAmirpour/notification_server/internal/adapters"
 	"github.com/KianoushAmirpour/notification_server/internal/config"
@@ -96,4 +100,34 @@ func (h *UserHandler) ImageGenerationHandler(c *gin.Context) {
 
 	c.JSON(http.StatusCreated, gin.H{"Message": resp.Message})
 
+}
+
+func (h *UserHandler) HealthHandler(c *gin.Context) {
+
+	status := http.StatusOK
+
+	var memStat runtime.MemStats
+	runtime.ReadMemStats(&memStat)
+
+	ctx, cancelFunc := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancelFunc()
+
+	var dbhealthy bool = true
+	dbErr := h.UserSvc.DbPool.Ping(ctx)
+	if dbErr != nil {
+		dbhealthy = false
+		status = http.StatusServiceUnavailable
+	}
+
+	go func() {
+		http.ListenAndServe("localhost:6060", nil)
+	}()
+
+	c.JSON(status, gin.H{"status": gin.H{"status code": status}, "memory": gin.H{"allocated heap objects (MB)": memStat.Alloc / 1024 / 1024,
+		"cumulative allocated for heap objects (MB)": memStat.TotalAlloc / 1024 / 1024,
+		"total memory obtained from the OS (MB)":     memStat.Sys / 1024 / 1024,
+		"number of completed GC cycles":              memStat.NumGC,
+		"number of goroutines that currently exist":  runtime.NumGoroutine()},
+		"database": gin.H{"Postgres health": dbhealthy}},
+	)
 }
