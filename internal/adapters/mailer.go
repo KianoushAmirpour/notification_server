@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"fmt"
+	"log/slog"
 
 	gomail "gopkg.in/mail.v2"
 )
@@ -12,6 +13,7 @@ type Mailer struct {
 	Username  string
 	Password  string
 	FromEmail string
+	Logger    *slog.Logger
 }
 
 func (m Mailer) SendVerification(email string, otp int) error {
@@ -27,7 +29,8 @@ func (m Mailer) SendVerification(email string, otp int) error {
 	if err := dialer.DialAndSend(message); err != nil {
 		return err
 	} else {
-		fmt.Println("HTML Email sent successfully with a plain-text alternative!")
+		// fmt.Println("HTML Email sent successfully with a plain-text alternative!")
+		m.Logger.Info("verification_email_sent", slog.String("to", email))
 		return nil
 	}
 
@@ -46,7 +49,8 @@ func (m Mailer) SendNotification(email string) error {
 	if err := dialer.DialAndSend(message); err != nil {
 		return err
 	} else {
-		fmt.Println("HTML Email sent successfully with a plain-text alternative!")
+		// fmt.Println("HTML Email sent successfully with a plain-text alternative!")
+		m.Logger.Info("notification_email_sent", slog.String("to", email))
 		return nil
 	}
 

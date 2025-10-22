@@ -48,7 +48,8 @@ func main() {
 		Port:      cfg.SmtpPort,
 		Username:  cfg.SmtpUsername,
 		Password:  cfg.SmtpPassword,
-		FromEmail: cfg.FromEmail}
+		FromEmail: cfg.FromEmail,
+		Logger:    logger}
 
 	iplimiter := adapters.NewIpLimiter()
 

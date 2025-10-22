@@ -77,6 +77,13 @@ func (wp *WorkerPool) ProcessJob(workerid int, resultchan chan string) {
 	go func() {
 		start := time.Now()
 		log := wp.Logger.With(slog.String("service", "worker_pool"), slog.Int("worker_id", workerid))
+
+		defer func() {
+			if r := recover(); r != nil {
+				log.Error("worker_paniced", slog.String("reason", r.(string)))
+			}
+		}()
+
 		for {
 			select {
 			case <-wp.Ctx.Done():
@@ -91,10 +98,16 @@ func (wp *WorkerPool) ProcessJob(workerid int, resultchan chan string) {
 				ctx, err := job.Run(wp.Ctx)
 				if err != nil {
 					log.Error("story_job_failed", slog.String("reason", err.Error()), slog.Int("duration_us", int(time.Since(start).Microseconds())))
-					return
+					wp.Wg.Done()
+					continue
 				}
-				resultchan <- ctx.Value(userEmailKey).(string)
-				log.Info("story_job_completed", slog.String("sent_email_fo_notification", ctx.Value(userEmailKey).(string)), slog.Int("duration_us", int(time.Since(start).Microseconds())))
+				email, ok := ctx.Value(userEmailKey).(string)
+				if ok {
+					resultchan <- ctx.Value(userEmailKey).(string)
+					log.Info("story_job_completed", slog.String("sent_email_fo_notification", email), slog.Int("duration_us", int(time.Since(start).Microseconds())))
+				} else {
+					log.Error("story_job_failed", slog.String("reason", "invalid email in context"))
+				}
 				wp.Wg.Done()
 			}
 		}
