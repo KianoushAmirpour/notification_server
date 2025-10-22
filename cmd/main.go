@@ -21,6 +21,8 @@ func main() {
 		panic(err)
 	}
 
+	logger := adapters.InitializeLogger(cfg.LogFile)
+
 	// conn, err := postgres.OpenDatabaseConn(cfg.DatabaseDSN)
 	// if err != nil {
 	// 	panic(err)
@@ -56,12 +58,12 @@ func main() {
 
 	gemeniClient := ai.NewGemeniClient(context.Background(), cfg)
 
-	workerPool := adapters.NewWorkerPool(cfg.WorkerCounts, cfg.JobQueueSize)
-	resultchan := make(chan string, 10)
+	workerPool := adapters.NewWorkerPool(cfg.WorkerCounts, cfg.JobQueueSize, logger)
+	resultchan := make(chan string, 100)
 	workerPool.Start(resultchan)
 	storyGenerationSvc := service.NewStoryGenerationService(UserRepo, gemeniClient, workerPool)
 
-	h := handler.NewUserHandler(userRegisterSvc, storyGenerationSvc, cfg, iplimiter)
+	h := handler.NewUserHandler(userRegisterSvc, storyGenerationSvc, cfg, iplimiter, logger)
 
 	routerCfg := router.RouterConfig{UserHandler: h}
 

@@ -28,6 +28,7 @@ type Config struct {
 	MaxAllowedSize    int     `mapstructure:"JSON_BODY_MAX_SIZE" validate:"required,gte=0"`
 	FromEmail         string  `mapstructure:"FROM_EMAIL" validate:"required"`
 	JwtISS            string  `mapstructure:"ISS" validate:"required"`
+	LogFile           string  `mapstructure:"LOGGING_FILE" validate:"required"`
 }
 
 func LoadConfigs(path string) (*Config, error) {

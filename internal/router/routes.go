@@ -23,18 +23,19 @@ func SetupRoutes(config RouterConfig) *gin.Engine {
 		AllowHeaders:     []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
-	}), middleware.AddRequestID())
+	}), middleware.AddRequestID(), middleware.LoggingRequestMiddleware(config.UserHandler.Logger))
 
 	protectedGroup := g.Group("/api", middleware.AuthenticateMiddleware([]byte(config.UserHandler.Config.JwtSecret)))
 	{
 		protectedGroup.Handle("DELETE", "/users", middleware.CheckContentType(), middleware.RegisterMiddelware[domain.User](config.UserHandler.Config.MaxAllowedSize), config.UserHandler.DeleteUserHandler)
-		protectedGroup.Handle("POST", "/stories/generate", middleware.RateLimiterMiddelware(config.UserHandler.IpRateLimiter,
-			config.UserHandler.Config.RataLimitCapacity, config.UserHandler.Config.RataLimitFillRate),
-			config.UserHandler.ImageGenerationHandler)
+		protectedGroup.Handle("POST", "/stories/generate",
+			middleware.RateLimiterMiddelware(config.UserHandler.IpRateLimiter,
+				config.UserHandler.Config.RataLimitCapacity, config.UserHandler.Config.RataLimitFillRate, config.UserHandler.Logger),
+			config.UserHandler.StoryGenerationHandler)
 	}
 
 	api := g.Group("/api", middleware.CheckContentType(), middleware.RateLimiterMiddelware(config.UserHandler.IpRateLimiter,
-		config.UserHandler.Config.RataLimitCapacity, config.UserHandler.Config.RataLimitFillRate))
+		config.UserHandler.Config.RataLimitCapacity, config.UserHandler.Config.RataLimitFillRate, config.UserHandler.Logger))
 	{
 
 		api.Handle("POST", "/users/register", middleware.RegisterMiddelware[domain.RegisteredUser](config.UserHandler.Config.MaxAllowedSize), middleware.AddCorrelationID(), config.UserHandler.RegisterHandler)

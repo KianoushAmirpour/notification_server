@@ -2,8 +2,9 @@ package adapters
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
 	"sync"
+	"time"
 
 	"github.com/KianoushAmirpour/notification_server/internal/adapters/ai"
 	"github.com/KianoushAmirpour/notification_server/internal/domain"
@@ -19,24 +20,31 @@ type GenerateStoryJob struct {
 	UserPreferences string
 	StoryGenerator  *ai.GemeniClient
 	UserRepo        repository.UserRepository
+	Logger          *slog.Logger
 }
 
 func (j GenerateStoryJob) Run(ctx context.Context) (context.Context, error) {
+
+	log := j.Logger.With(slog.String("service", "run_story_job"), slog.Int("user_id", j.UserID), slog.String("user_preferences", j.UserPreferences))
 	output, err := j.StoryGenerator.GenerateStory(ctx, j.UserPreferences)
 	if err != nil {
+		log.Error("run_story_job_failed_generate_story_by_ai", slog.String("reason", err.Error()))
 		return ctx, err
 	}
 
 	story := domain.UploadStory{UserID: j.UserID, Story: output}
 	err = j.UserRepo.Upload(ctx, &story)
 	if err != nil {
+		log.Error("run_story_job_failed_upload_story_to_db", slog.String("reason", err.Error()))
 		return ctx, err
 	}
 	u, err := j.UserRepo.GetUserByID(ctx, j.UserID)
 	if err != nil {
+		log.Error("run_story_job_failed_get_user_by_id", slog.String("reason", err.Error()))
 		return ctx, err
 	}
 	newctx := context.WithValue(ctx, userEmailKey, u.Email)
+	log.Info("run_story_job_suucessful")
 	return newctx, nil
 
 }
@@ -47,9 +55,10 @@ type WorkerPool struct {
 	Ctx          context.Context
 	CancelFunc   context.CancelFunc
 	Wg           *sync.WaitGroup
+	Logger       *slog.Logger
 }
 
-func NewWorkerPool(workercounts int, queuesize int) *WorkerPool {
+func NewWorkerPool(workercounts int, queuesize int, logger *slog.Logger) *WorkerPool {
 	ctx, cancelFunc := context.WithCancel(context.Background())
 
 	wp := &WorkerPool{
@@ -57,29 +66,35 @@ func NewWorkerPool(workercounts int, queuesize int) *WorkerPool {
 		JobQueue:     make(chan repository.Job, queuesize),
 		Ctx:          ctx,
 		CancelFunc:   cancelFunc,
-		Wg:           &sync.WaitGroup{}}
+		Wg:           &sync.WaitGroup{},
+		Logger:       logger,
+	}
 
 	return wp
 }
 
 func (wp *WorkerPool) ProcessJob(workerid int, resultchan chan string) {
 	go func() {
-		fmt.Printf("[worker %d] started\n", workerid)
+		start := time.Now()
+		log := wp.Logger.With(slog.String("service", "worker_pool"), slog.Int("worker_id", workerid))
 		for {
 			select {
 			case <-wp.Ctx.Done():
-				fmt.Printf("[worker %d] is stopping.", workerid)
+				log.Warn("worker_stopped", slog.String("reason", "worker_exited_context_canceled"), slog.Int("duration_us", int(time.Since(start).Microseconds())))
 				return
 			case job, ok := <-wp.JobQueue:
 				if !ok {
-					fmt.Printf("[worker %d] exiting (job queue closed)\n", workerid)
+					log.Warn("worker_stopped", slog.String("reason", "worker_exited_job_queue_closed"), slog.Int("duration_us", int(time.Since(start).Microseconds())))
 					return
 				}
+				start := time.Now()
 				ctx, err := job.Run(wp.Ctx)
 				if err != nil {
+					log.Error("story_job_failed", slog.String("reason", err.Error()), slog.Int("duration_us", int(time.Since(start).Microseconds())))
 					return
 				}
 				resultchan <- ctx.Value(userEmailKey).(string)
+				log.Info("story_job_completed", slog.String("sent_email_fo_notification", ctx.Value(userEmailKey).(string)), slog.Int("duration_us", int(time.Since(start).Microseconds())))
 				wp.Wg.Done()
 			}
 		}
@@ -96,12 +111,16 @@ func (wp *WorkerPool) Submit(job repository.Job) {
 	select {
 	case wp.JobQueue <- job:
 		wp.Wg.Add(1)
+		wp.Logger.Info("story_ob_submitted", slog.Int("current_queue_size", len(wp.JobQueue)))
 	default:
+		wp.Logger.Warn("story_job_dropped", slog.Int("current_queue_size", len(wp.JobQueue)))
 	}
 }
 
 func (wp *WorkerPool) Stop() {
 	close(wp.JobQueue)
+	wp.Logger.Warn("job_channel_closed")
 	wp.Wg.Wait()
 	wp.CancelFunc()
+	wp.Logger.Warn("all_workers_canceled")
 }

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
 	"net/http"
 	"regexp"
 	"strconv"
@@ -191,20 +192,35 @@ func ValidationIDParam() gin.HandlerFunc {
 	}
 }
 
-func RateLimiterMiddelware(ipratelimiter *adapters.IPRateLimiter, capacity, fillrate float64) gin.HandlerFunc {
+func RateLimiterMiddelware(ipratelimiter *adapters.IPRateLimiter, capacity, fillrate float64, logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
+		log := logger.With(slog.String("service", "rate_limit"), slog.String("request_id", c.GetString("RequestID")))
 		if ip == "" {
+			log.Warn("extract_user_ip", slog.String("reason", "invalid_user_ip"))
 			c.AbortWithStatusJSON(http.StatusInternalServerError, gin.H{"error": "invalid ip"})
 			return
 		}
 		rateLimiter := ipratelimiter.RequestRateLimiter(ip, capacity, fillrate)
 
 		if !rateLimiter.AllowRequest() {
-			fmt.Println("Rate limit exceeded for IP:", ip)
+			log.Warn("rate_limit_check", slog.String("reason", "rate_limit_exceeded"), slog.String("user_ip", ip))
 			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{"error": "Rate Limit Exceeded"})
 			return
 		}
+		c.Next()
+	}
+}
+
+func LoggingRequestMiddleware(logger *slog.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+
+		logger.Info("http_request_start",
+			slog.String("request_id", c.GetString("RequestID")),
+			slog.String("method", c.Request.Method),
+			slog.String("user-agent", c.Request.UserAgent()),
+			slog.String("path", c.FullPath()))
+
 		c.Next()
 	}
 }
