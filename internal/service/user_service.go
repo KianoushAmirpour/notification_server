@@ -111,22 +111,6 @@ func (s *UserRegisterService) RegisterUser(ctx context.Context, req domain.Regis
 		close(emailErrChan)
 	}()
 
-	// eg, _ := errgroup.WithContext(context.Background())
-
-	// eg.Go(func() error {
-	// 	return s.Otp.SaveOTP(timeoutCtx, req.Email, otp, cfg.OTPExpiration)
-	// })
-
-	// eg.Go(func() error {
-	// 	return s.Mailer.SendVerification(req.Email, otp)
-	// })
-
-	// err = eg.Wait()
-	// if err != nil {
-	// 	log.Error("register_user_failed_save_send_otp", slog.String("reason", err.Error()))
-	// 	return nil, domain.NewDomainError(domain.ErrCodeInternal, "registration failed", err)
-	// }
-
 	err = <-otpErrChan
 	if err != nil {
 		log.Error("register_user_failed_save_otp", slog.String("reason", err.Error()))

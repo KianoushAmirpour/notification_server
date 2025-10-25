@@ -7,6 +7,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"reflect"
 	"regexp"
 	"runtime/debug"
 	"strings"
@@ -161,6 +162,12 @@ func RegisterMiddelware[T any](maxsize int) gin.HandlerFunc {
 			c.AbortWithStatusJSON(httpErr.StatusCode, httpErr)
 			return
 		}
+		err = validate.RegisterValidation("user_preferences_check", UserPreferencesValidation)
+		if err != nil {
+			httpErr := transport.HttpError{Message: "failed to register validation", Code: domain.ErrCodeInternal, StatusCode: http.StatusInternalServerError}
+			c.AbortWithStatusJSON(httpErr.StatusCode, httpErr)
+			return
+		}
 		err = validate.Struct(u)
 		if err != nil {
 			httpErr := transport.HttpError{Message: err.Error(), Code: domain.ErrCodeInternal, StatusCode: http.StatusBadRequest}
@@ -190,6 +197,38 @@ func PasswordValidator(fl validator.FieldLevel) bool {
 
 	if !regexp.MustCompile(`[@$!%*?&]`).MatchString(password) {
 		return false
+	}
+
+	return true
+}
+
+func UserPreferencesValidation(fl validator.FieldLevel) bool {
+	field := fl.Field()
+
+	if field.Kind() != reflect.Slice {
+		return false
+	}
+
+	if field.Len() > 5 {
+		return false
+	}
+
+	for i := 0; i < field.Len(); i++ {
+		item := field.Index(i)
+
+		if item.Kind() != reflect.String {
+			return false
+		}
+
+		preferences := item.String()
+		if len(preferences) > 20 {
+			return false
+		}
+
+		if len(strings.TrimSpace(preferences)) == 0 {
+			return false
+		}
+
 	}
 
 	return true

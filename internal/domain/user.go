@@ -16,7 +16,7 @@ type RegisteredUser struct {
 	LastName    string   `json:"last_name" validate:"required"`
 	Email       string   `json:"email" validate:"required,email"`
 	Password    string   `json:"password" validate:"required,min=8,max=64,passwod_strength"`
-	Preferences []string `json:"preferences" validate:"required,unique"`
+	Preferences []string `json:"preferences" validate:"required,unique,user_preferences_check"`
 }
 
 type RegisterResponse struct {
