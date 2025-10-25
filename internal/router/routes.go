@@ -23,7 +23,7 @@ func SetupRoutes(config RouterConfig) *gin.Engine {
 		AllowHeaders:     []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
-	}), middleware.AddRequestID(), middleware.LoggingRequestMiddleware(config.UserHandler.Logger))
+	}), middleware.AddRequestID(), middleware.LoggingRequestMiddleware(config.UserHandler.Logger), middleware.PanicRecoveryMiddleware(config.UserHandler.Logger))
 
 	protectedGroup := g.Group("/api", middleware.AuthenticateMiddleware([]byte(config.UserHandler.Config.JwtSecret)))
 	{

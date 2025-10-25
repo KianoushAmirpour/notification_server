@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 
 	"github.com/KianoushAmirpour/notification_server/internal/adapters"
 	"github.com/KianoushAmirpour/notification_server/internal/adapters/ai"
 	"github.com/KianoushAmirpour/notification_server/internal/config"
+	"github.com/KianoushAmirpour/notification_server/internal/domain"
 	"github.com/KianoushAmirpour/notification_server/internal/handler"
 	"github.com/KianoushAmirpour/notification_server/internal/repository/postgres"
 	"github.com/KianoushAmirpour/notification_server/internal/repository/redis"
@@ -72,11 +74,12 @@ func main() {
 
 	go func() {
 		for userEmail := range resultchan {
-			fmt.Println(userEmail)
 			err = mailer.SendNotification(userEmail)
 			if err != nil {
-				panic(err)
+				notifError := domain.NewDomainError(domain.ErrCodeExternal, "failed to send email notification", err)
+				logger.Error("email_notification_failed", slog.String("email", userEmail), slog.String("reason", notifError.Error()))
 			}
+			logger.Info("notification_sent_successfully", slog.String("email", userEmail))
 		}
 	}()
 

@@ -17,15 +17,6 @@ type PostgresPoolUserRepo struct {
 	Db *pgxpool.Pool
 }
 
-// type User struct {
-// 	ID          int
-// 	FirstName   string
-// 	LastName    string
-// 	Email       string
-// 	Password    string
-// 	Preferences []string
-// }
-
 func NewPostgresUserRepo(db *pgx.Conn) *PostgresUserRepo {
 	return &PostgresUserRepo{Db: db}
 }
@@ -78,7 +69,6 @@ func (r *PostgresPoolUserRepo) CreateUserStaging(ctx context.Context, tx pgx.Tx,
 			   values ($1, $2, $3, $4, $5) returning id
 	`
 	row := tx.QueryRow(ctx, query, u.FirstName, u.LastName, u.Email, u.Password, u.Preferences)
-	// row := r.Db.QueryRow(ctx, query, u.FirstName, u.LastName, u.Email, u.Password, u.Preferences)
 	err := row.Scan(&returnedID)
 	if err != nil {
 		return err
@@ -109,7 +99,7 @@ func (r *PostgresPoolUserRepo) GetUserByID(ctx context.Context, id int) (*domain
 	row := r.Db.QueryRow(ctx, query, id)
 	err := row.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.Preferences)
 	if err != nil {
-		return nil, errors.New("user not found")
+		return nil, err
 	}
 	return &u, nil
 
@@ -122,7 +112,7 @@ func (r *PostgresPoolUserRepo) GetByEmail(ctx context.Context, email string) (*d
 	row := r.Db.QueryRow(ctx, query, email)
 	err := row.Scan(&u.ID, &u.FirstName, &u.LastName, &u.Email, &u.Password, &u.Preferences)
 	if err != nil {
-		return nil, errors.New("user not found")
+		return nil, err
 	}
 	return &u, nil
 }
@@ -182,7 +172,7 @@ func (r *PostgresPoolUserRepo) GetEmailByReqID(ctx context.Context, tx pgx.Tx, r
 	// row := r.Db.QueryRow(ctx, query, reqid)
 	err := row.Scan(&e)
 	if err != nil {
-		return "", errors.New("invalid request")
+		return "", err
 	}
 	return e, nil
 }

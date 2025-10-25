@@ -13,6 +13,7 @@ import (
 	"github.com/KianoushAmirpour/notification_server/internal/config"
 	"github.com/KianoushAmirpour/notification_server/internal/domain"
 	"github.com/KianoushAmirpour/notification_server/internal/service"
+	"github.com/KianoushAmirpour/notification_server/internal/transport"
 	"github.com/gin-gonic/gin"
 )
 
@@ -39,7 +40,8 @@ func (h *UserHandler) RegisterHandler(c *gin.Context) {
 
 	res, err := h.UserSvc.RegisterUser(c.Request.Context(), req, h.Config, reqID, h.Logger)
 	if err != nil {
-		c.JSON(err.StatusCode, gin.H{"Message": err.Message})
+		httpErr := transport.MapDomainErrToHttpErr(err)
+		c.JSON(httpErr.StatusCode, httpErr)
 		return
 	}
 
@@ -53,8 +55,9 @@ func (h *UserHandler) VerificationHandler(c *gin.Context) {
 
 	resp, err := h.UserSvc.VerifyUser(c.Request.Context(), req, reqID, h.Logger)
 	if err != nil {
-		c.JSON(err.StatusCode, gin.H{"Message": err.Message})
-		c.Redirect(http.StatusSeeOther, "http://localhost:4000/api/user/register")
+		httpErr := transport.MapDomainErrToHttpErr(err)
+		c.JSON(httpErr.StatusCode, httpErr)
+		// c.Redirect(http.StatusSeeOther, "http://localhost:4000/api/user/register")
 		return
 	}
 	h.Logger.Info("http_request_end", slog.String("request_id", c.GetString("RequestID")), slog.Int("status", http.StatusCreated))
@@ -67,8 +70,9 @@ func (h *UserHandler) LoginHandler(c *gin.Context) {
 
 	resp, err := h.UserSvc.AuthenticateUser(c.Request.Context(), req, h.Config, h.Logger)
 	if err != nil {
-		c.JSON(err.StatusCode, gin.H{"Message": err.Message})
-		c.Redirect(http.StatusSeeOther, "http://localhost:4000/api/user/register")
+		httpErr := transport.MapDomainErrToHttpErr(err)
+		c.JSON(httpErr.StatusCode, httpErr)
+		// c.Redirect(http.StatusSeeOther, "http://localhost:4000/api/user/register")
 		return
 	}
 	c.Header("Authorization", "Bearer "+resp.Message)
@@ -83,7 +87,8 @@ func (h *UserHandler) DeleteUserHandler(c *gin.Context) {
 
 	resp, err := h.UserSvc.DeleteUser(c.Request.Context(), req, h.Logger)
 	if err != nil {
-		c.JSON(err.StatusCode, gin.H{"Message": err.Message})
+		httpErr := transport.MapDomainErrToHttpErr(err)
+		c.JSON(httpErr.StatusCode, httpErr)
 		return
 	}
 	h.Logger.Info("http_request_end", slog.String("request_id", c.GetString("RequestID")), slog.Int("status", http.StatusCreated))
@@ -96,7 +101,8 @@ func (h *UserHandler) StoryGenerationHandler(c *gin.Context) {
 	userID := c.GetInt("user_id")
 	resp, err := h.ImageSvc.GenerateStory(c.Request.Context(), userID, h.Logger)
 	if err != nil {
-		c.JSON(err.StatusCode, gin.H{"Message": err.Message})
+		httpErr := transport.MapDomainErrToHttpErr(err)
+		c.JSON(httpErr.StatusCode, httpErr)
 		return
 	}
 	h.Logger.Info("http_request_end", slog.String("request_id", c.GetString("RequestID")), slog.Int("status", http.StatusCreated))

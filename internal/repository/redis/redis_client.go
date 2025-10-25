@@ -2,11 +2,11 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strconv"
 	"time"
 
-	"github.com/KianoushAmirpour/notification_server/internal/domain"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -84,7 +84,7 @@ func (r RedisClient) VerifyOTP(ctx context.Context, email string, sentopt int) e
 
 	if tries >= 3 {
 		r.Client.Del(ctx, key)
-		return domain.ErrTooManyAttempts
+		return errors.New("too many request")
 
 	}
 
@@ -93,7 +93,7 @@ func (r RedisClient) VerifyOTP(ctx context.Context, email string, sentopt int) e
 		if retryset.Err() != nil {
 			return err
 		}
-		return domain.ErrInvalidOtp
+		return errors.New("invalid otp")
 	}
 
 	r.Client.Del(ctx, key)

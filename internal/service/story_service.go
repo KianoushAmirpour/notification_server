@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"strings"
 	"time"
 
@@ -24,14 +23,14 @@ func NewStoryGenerationService(users repository.UserRepository, storygen *ai.Gem
 	return &StoryGenerationService{Users: users, StoryGen: storygen, WorkerPool: pool}
 }
 
-func (s *StoryGenerationService) GenerateStory(ctx context.Context, userid int, logger *slog.Logger) (*domain.StoryRequestResponse, *domain.APIError) {
+func (s *StoryGenerationService) GenerateStory(ctx context.Context, userid int, logger *slog.Logger) (*domain.StoryRequestResponse, *domain.DomainError) {
 	start := time.Now()
 	log := logger.With(slog.String("service", "story_generateion"), slog.Int("user_id", userid))
 
 	u, err := s.Users.GetUserByID(ctx, userid)
 	if err != nil {
 		log.Error("story_generateion_failed_get_user_by_id", slog.String("reason", err.Error()))
-		return nil, domain.NewAPIError(err, http.StatusNotFound)
+		return nil, domain.NewDomainError(domain.ErrCodeNotFound, "user not found", err)
 	}
 
 	keywords := strings.Join(u.Preferences, "_")
@@ -41,7 +40,7 @@ func (s *StoryGenerationService) GenerateStory(ctx context.Context, userid int, 
 	err = s.Users.SaveStoryMetaData(ctx, story)
 	if err != nil {
 		log.Error("story_generateion_failed_store_story_metadata", slog.String("reason", err.Error()))
-		return nil, domain.NewAPIError(err, http.StatusInternalServerError)
+		return nil, domain.NewDomainError(domain.ErrCodeInternal, "failed to save save story meta data", err)
 	}
 
 	job := &adapters.GenerateStoryJob{

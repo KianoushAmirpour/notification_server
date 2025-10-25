@@ -29,19 +29,19 @@ func (j GenerateStoryJob) Run(ctx context.Context) (context.Context, error) {
 	output, err := j.StoryGenerator.GenerateStory(ctx, j.UserPreferences)
 	if err != nil {
 		log.Error("run_story_job_failed_generate_story_by_ai", slog.String("reason", err.Error()))
-		return ctx, err
+		return ctx, domain.NewDomainError(domain.ErrCodeExternal, "failed to generate story", err)
 	}
 
 	story := domain.UploadStory{UserID: j.UserID, Story: output}
 	err = j.UserRepo.Upload(ctx, &story)
 	if err != nil {
 		log.Error("run_story_job_failed_upload_story_to_db", slog.String("reason", err.Error()))
-		return ctx, err
+		return ctx, domain.NewDomainError(domain.ErrCodeInternal, "failed to save story", err)
 	}
 	u, err := j.UserRepo.GetUserByID(ctx, j.UserID)
 	if err != nil {
 		log.Error("run_story_job_failed_get_user_by_id", slog.String("reason", err.Error()))
-		return ctx, err
+		return ctx, domain.NewDomainError(domain.ErrCodeNotFound, "user not found", err)
 	}
 	newctx := context.WithValue(ctx, userEmailKey, u.Email)
 	log.Info("run_story_job_suucessful")
@@ -103,7 +103,7 @@ func (wp *WorkerPool) ProcessJob(workerid int, resultchan chan string) {
 				}
 				email, ok := ctx.Value(userEmailKey).(string)
 				if ok {
-					resultchan <- ctx.Value(userEmailKey).(string)
+					resultchan <- email
 					log.Info("story_job_completed", slog.String("sent_email_fo_notification", email), slog.Int("duration_us", int(time.Since(start).Microseconds())))
 				} else {
 					log.Error("story_job_failed", slog.String("reason", "invalid email in context"))
