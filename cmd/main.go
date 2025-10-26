@@ -25,18 +25,16 @@ func main() {
 
 	logger := adapters.InitializeLogger(cfg.LogFile)
 
-	// conn, err := postgres.OpenDatabaseConn(cfg.DatabaseDSN)
-	// if err != nil {
-	// 	panic(err)
-	// }
-
 	dbPool, err := postgres.OpenDatabaseConnPool(cfg.DatabaseDSN)
 	if err != nil {
+		logger.Error("database connection failed", slog.String("reason", err.Error()))
 		panic(err)
 	}
+	defer dbPool.Close()
 
 	redisConn, err := redis.ConnectToRedis(fmt.Sprintf("localhost:%d", cfg.RedisPort), cfg.RedisDB)
 	if err != nil {
+		logger.Error("redis connection failed", slog.String("reason", err.Error()))
 		panic(err)
 	}
 	defer redisConn.Close()
