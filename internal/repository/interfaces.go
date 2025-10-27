@@ -33,6 +33,7 @@ type OTPService interface {
 
 type Mailer interface {
 	SendVerification(email string, otp int) error
+	SendNotification(email string) error
 }
 
 type Job interface {
@@ -41,7 +42,7 @@ type Job interface {
 
 type WorkerPool interface {
 	Submit(job Job)
-	Start(resultchan chan string)
+	Start(resultchan chan Job)
 	Stop()
 }
 

@@ -3,7 +3,7 @@ package ai
 import (
 	"context"
 	"fmt"
-	"log"
+	"log/slog"
 
 	"github.com/KianoushAmirpour/notification_server/internal/config"
 	"google.golang.org/genai"
@@ -12,14 +12,15 @@ import (
 type GemeniClient struct {
 	Client *genai.Client
 	Cfg    *config.Config
+	Logger *slog.Logger
 }
 
-func NewGemeniClient(ctx context.Context, cfg *config.Config) *GemeniClient {
+func NewGemeniClient(ctx context.Context, cfg *config.Config, logger *slog.Logger) *GemeniClient {
 	client, err := genai.NewClient(ctx, &genai.ClientConfig{APIKey: cfg.GemeniAPI})
 	if err != nil {
-		log.Fatal(err)
+		logger.Error("failed to create gemeni client", slog.String("reason", err.Error()))
 	}
-	return &GemeniClient{Client: client, Cfg: cfg}
+	return &GemeniClient{Client: client, Cfg: cfg, Logger: logger}
 }
 
 func (g GemeniClient) GenerateStory(ctx context.Context, preferences string) (string, error) {
@@ -31,9 +32,11 @@ func (g GemeniClient) GenerateStory(ctx context.Context, preferences string) (st
 		nil)
 
 	if err != nil {
+		g.Logger.Error("failed to generate story", slog.String("reason", err.Error()))
 		return "", err
 	}
 
+	g.Logger.Info("story was generated")
 	return result.Text(), nil
 
 }

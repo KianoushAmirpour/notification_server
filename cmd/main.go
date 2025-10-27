@@ -8,8 +8,8 @@ import (
 	"github.com/KianoushAmirpour/notification_server/internal/adapters"
 	"github.com/KianoushAmirpour/notification_server/internal/adapters/ai"
 	"github.com/KianoushAmirpour/notification_server/internal/config"
-	"github.com/KianoushAmirpour/notification_server/internal/domain"
 	"github.com/KianoushAmirpour/notification_server/internal/handler"
+	"github.com/KianoushAmirpour/notification_server/internal/repository"
 	"github.com/KianoushAmirpour/notification_server/internal/repository/postgres"
 	"github.com/KianoushAmirpour/notification_server/internal/repository/redis"
 	"github.com/KianoushAmirpour/notification_server/internal/router"
@@ -17,6 +17,9 @@ import (
 )
 
 func main() {
+
+	rootctx, rootcancel := context.WithCancel(context.Background())
+	defer rootcancel()
 
 	cfg, err := config.LoadConfigs("../.env")
 	if err != nil {
@@ -57,11 +60,14 @@ func main() {
 
 	userRegisterSvc := service.NewUserRegisterService(UserRepo, bcryptHasher, mailer, otpService, dbPool)
 
-	gemeniClient := ai.NewGemeniClient(context.Background(), cfg)
+	gemeniClient := ai.NewGemeniClient(rootctx, cfg, logger)
 
-	workerPool := adapters.NewWorkerPool(cfg.WorkerCounts, cfg.JobQueueSize, logger)
-	resultchan := make(chan string, 100)
+	resultchan := make(chan repository.Job, 10)
+	emailWorkerPool := adapters.NewEmailWorkerPool(rootctx, cfg.WorkerCounts, cfg.JobQueueSize, logger)
+	emailWorkerPool.Start(resultchan)
+	workerPool := adapters.NewWorkerPool(rootctx, cfg.WorkerCounts, cfg.JobQueueSize, logger, mailer)
 	workerPool.Start(resultchan)
+
 	storyGenerationSvc := service.NewStoryGenerationService(UserRepo, gemeniClient, workerPool)
 
 	h := handler.NewUserHandler(userRegisterSvc, storyGenerationSvc, cfg, iplimiter, logger)
@@ -71,14 +77,7 @@ func main() {
 	g := router.SetupRoutes(routerCfg)
 
 	go func() {
-		for userEmail := range resultchan {
-			err = mailer.SendNotification(userEmail)
-			if err != nil {
-				notifError := domain.NewDomainError(domain.ErrCodeExternal, "failed to send email notification", err)
-				logger.Error("email_notification_failed", slog.String("email", userEmail), slog.String("reason", notifError.Error()))
-			}
-			logger.Info("notification_sent_successfully", slog.String("email", userEmail))
-		}
+		emailWorkerPool.Wg.Wait()
 	}()
 
 	go func() {
@@ -89,6 +88,7 @@ func main() {
 
 	close(resultchan)
 	workerPool.CancelFunc()
+	emailWorkerPool.CancelFunc()
 	close(workerPool.JobQueue)
 
 }

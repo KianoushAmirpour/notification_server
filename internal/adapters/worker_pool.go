@@ -56,10 +56,11 @@ type WorkerPool struct {
 	CancelFunc   context.CancelFunc
 	Wg           *sync.WaitGroup
 	Logger       *slog.Logger
+	Mailer       repository.Mailer
 }
 
-func NewWorkerPool(workercounts int, queuesize int, logger *slog.Logger) *WorkerPool {
-	ctx, cancelFunc := context.WithCancel(context.Background())
+func NewWorkerPool(ctx context.Context, workercounts int, queuesize int, logger *slog.Logger, mailer repository.Mailer) *WorkerPool {
+	ctx, cancelFunc := context.WithCancel(ctx)
 
 	wp := &WorkerPool{
 		workerCounts: workercounts,
@@ -68,12 +69,13 @@ func NewWorkerPool(workercounts int, queuesize int, logger *slog.Logger) *Worker
 		CancelFunc:   cancelFunc,
 		Wg:           &sync.WaitGroup{},
 		Logger:       logger,
+		Mailer:       mailer,
 	}
 
 	return wp
 }
 
-func (wp *WorkerPool) ProcessJob(workerid int, resultchan chan string) {
+func (wp *WorkerPool) ProcessJob(workerid int, resultchan chan repository.Job) {
 	go func() {
 		start := time.Now()
 		log := wp.Logger.With(slog.String("service", "worker_pool"), slog.Int("worker_id", workerid))
@@ -103,7 +105,8 @@ func (wp *WorkerPool) ProcessJob(workerid int, resultchan chan string) {
 				}
 				email, ok := ctx.Value(userEmailKey).(string)
 				if ok {
-					resultchan <- email
+					emailJob := EmailNotificationJob{email, wp.Mailer, wp.Logger}
+					resultchan <- emailJob
 					log.Info("story_job_completed", slog.String("sent_email_fo_notification", email), slog.Int("duration_us", int(time.Since(start).Microseconds())))
 				} else {
 					log.Error("story_job_failed", slog.String("reason", "invalid email in context"))
@@ -114,7 +117,7 @@ func (wp *WorkerPool) ProcessJob(workerid int, resultchan chan string) {
 	}()
 }
 
-func (wp *WorkerPool) Start(resultchan chan string) {
+func (wp *WorkerPool) Start(resultchan chan repository.Job) {
 	for i := 1; i <= wp.workerCounts; i++ {
 		wp.ProcessJob(i, resultchan)
 	}
