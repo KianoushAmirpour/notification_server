@@ -2,8 +2,14 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/KianoushAmirpour/notification_server/internal/adapters"
 	"github.com/KianoushAmirpour/notification_server/internal/adapters/ai"
@@ -76,19 +82,36 @@ func main() {
 
 	g := router.SetupRoutes(routerCfg)
 
-	go func() {
-		emailWorkerPool.Wg.Wait()
-	}()
+	server := &http.Server{
+		Addr:    fmt.Sprintf(":%d", cfg.ServerPort),
+		Handler: g,
+	}
 
 	go func() {
-		workerPool.Wg.Wait()
+		err = server.ListenAndServe()
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			logger.Error("failed to start the server", slog.String("reason", err.Error()))
+		}
+		logger.Info("succuesfully start the server")
 	}()
 
-	g.Run(fmt.Sprintf(":%d", cfg.ServerPort))
+	sigchan := make(chan os.Signal, 1)
+	signal.Notify(sigchan, syscall.SIGINT, syscall.SIGTERM)
+	<-sigchan
 
-	close(resultchan)
+	shutdownctx, shutdowncancelFunc := context.WithTimeout(context.Background(), time.Duration(cfg.ServerShutdownTimeout)*time.Second)
+	defer shutdowncancelFunc()
+	if err := server.Shutdown(shutdownctx); err != nil {
+		logger.Error("Server closed with error", slog.String("reason", err.Error()))
+	}
+
 	workerPool.CancelFunc()
 	emailWorkerPool.CancelFunc()
+
+	workerPool.Wg.Wait()
+	workerPool.Wg.Wait()
+
 	close(workerPool.JobQueue)
+	close(resultchan)
 
 }

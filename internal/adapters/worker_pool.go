@@ -79,7 +79,7 @@ func (wp *WorkerPool) ProcessJob(workerid int, resultchan chan repository.Job) {
 	go func() {
 		start := time.Now()
 		log := wp.Logger.With(slog.String("service", "worker_pool"), slog.Int("worker_id", workerid))
-
+		log.Info("worker_pool_start")
 		defer func() {
 			if r := recover(); r != nil {
 				log.Error("worker_paniced", slog.String("reason", r.(string)))

@@ -56,7 +56,7 @@ func (wp *EmailWorkerPool) ProcessJob(workerid int, resultchan chan repository.J
 	go func() {
 		start := time.Now()
 		log := wp.Logger.With(slog.String("service", "email_worker_pool"), slog.Int("worker_id", workerid))
-
+		log.Info("email_worker_pool_start")
 		defer func() {
 			if r := recover(); r != nil {
 				log.Error("email_worker_paniced", slog.String("reason", r.(string)))
