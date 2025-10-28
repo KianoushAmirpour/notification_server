@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -56,10 +57,10 @@ func (wp *EmailWorkerPool) ProcessJob(workerid int, resultchan chan repository.J
 	go func() {
 		start := time.Now()
 		log := wp.Logger.With(slog.String("service", "email_worker_pool"), slog.Int("worker_id", workerid))
-		log.Info("email_worker_pool_start")
+		log.Info("email_worker_pool_started")
 		defer func() {
 			if r := recover(); r != nil {
-				log.Error("email_worker_paniced", slog.String("reason", r.(string)))
+				log.Error("email_worker_paniced", slog.String("reason", fmt.Sprintf("%v", r)))
 			}
 		}()
 
@@ -73,14 +74,16 @@ func (wp *EmailWorkerPool) ProcessJob(workerid int, resultchan chan repository.J
 					log.Warn("email_worker_pool", slog.String("reason", "worker_exited_job_queue_closed"), slog.Int("duration_us", int(time.Since(start).Microseconds())))
 					return
 				}
-				start := time.Now()
-				_, err := job.Run(wp.Ctx)
-				if err != nil {
-					log.Error("email_notification_job_failed", slog.String("reason", err.Error()), slog.Int("duration_us", int(time.Since(start).Microseconds())))
-					wp.Wg.Done()
-					continue
-				}
-				wp.Wg.Done()
+				wp.Wg.Add(1)
+				func(job repository.Job) {
+					defer wp.Wg.Done()
+					start := time.Now()
+					_, err := job.Run(wp.Ctx)
+					if err != nil {
+						log.Error("email_notification_job_failed", slog.String("reason", err.Error()), slog.Int("duration_us", int(time.Since(start).Microseconds())))
+					}
+				}(job)
+
 			}
 		}
 	}()
@@ -94,8 +97,8 @@ func (wp *EmailWorkerPool) Start(resultchan chan repository.Job) {
 
 func (wp *EmailWorkerPool) Stop() {
 	close(wp.JobQueue)
-	wp.Logger.Warn("job_channel_closed")
+	wp.Logger.Warn("email_job_channel_closed")
 	wp.Wg.Wait()
 	wp.CancelFunc()
-	wp.Logger.Warn("all_workers_canceled")
+	wp.Logger.Warn("all_email_workers_canceled")
 }

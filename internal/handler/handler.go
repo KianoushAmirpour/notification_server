@@ -127,9 +127,18 @@ func (h *UserHandler) HealthHandler(c *gin.Context) {
 		status = http.StatusServiceUnavailable
 	}
 
-	go func() {
-		http.ListenAndServe("localhost:6060", nil)
-	}()
+	go func(ctx context.Context) {
+		select {
+		case <-ctx.Done():
+			h.Logger.Info("http_request_end", slog.String("request_id", c.GetString("RequestID")),
+				slog.String("reason", "canceled_context"),
+				slog.Int("status", http.StatusCreated))
+			return
+		case <-time.After(5 * time.Second):
+			http.ListenAndServe("localhost:6060", nil)
+		}
+
+	}(c.Request.Context())
 
 	c.JSON(status, gin.H{"status": gin.H{"status code": status}, "memory": gin.H{"allocated heap objects (MB)": memStat.Alloc / 1024 / 1024,
 		"cumulative allocated for heap objects (MB)": memStat.TotalAlloc / 1024 / 1024,

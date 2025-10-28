@@ -2,6 +2,7 @@ package adapters
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -82,7 +83,7 @@ func (wp *WorkerPool) ProcessJob(workerid int, resultchan chan repository.Job) {
 		log.Info("worker_pool_started")
 		defer func() {
 			if r := recover(); r != nil {
-				log.Error("worker_paniced", slog.String("reason", r.(string)))
+				log.Error("worker_paniced", slog.String("reason", fmt.Sprintf("%v", r)))
 			}
 		}()
 

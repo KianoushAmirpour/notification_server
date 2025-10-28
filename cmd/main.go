@@ -110,7 +110,7 @@ func main() {
 	emailWorkerPool.CancelFunc()
 
 	workerPool.Wg.Wait()
-	workerPool.Wg.Wait()
+	emailWorkerPool.Wg.Wait()
 
 	close(workerPool.JobQueue)
 	close(resultchan)
