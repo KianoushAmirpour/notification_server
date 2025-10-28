@@ -44,7 +44,7 @@ func (j GenerateStoryJob) Run(ctx context.Context) (context.Context, error) {
 		return ctx, domain.NewDomainError(domain.ErrCodeNotFound, "user not found", err)
 	}
 	newctx := context.WithValue(ctx, userEmailKey, u.Email)
-	log.Info("run_story_job_suucessful")
+	log.Info("run_story_job_successfully")
 	return newctx, nil
 
 }
@@ -79,7 +79,7 @@ func (wp *WorkerPool) ProcessJob(workerid int, resultchan chan repository.Job) {
 	go func() {
 		start := time.Now()
 		log := wp.Logger.With(slog.String("service", "worker_pool"), slog.Int("worker_id", workerid))
-		log.Info("worker_pool_start")
+		log.Info("worker_pool_started")
 		defer func() {
 			if r := recover(); r != nil {
 				log.Error("worker_paniced", slog.String("reason", r.(string)))
@@ -107,7 +107,7 @@ func (wp *WorkerPool) ProcessJob(workerid int, resultchan chan repository.Job) {
 				if ok {
 					emailJob := EmailNotificationJob{email, wp.Mailer, wp.Logger}
 					resultchan <- emailJob
-					log.Info("story_job_completed", slog.String("sent_email_fo_notification", email), slog.Int("duration_us", int(time.Since(start).Microseconds())))
+					log.Info("story_job_completed_successfully", slog.String("sent_email_fo_notification", email), slog.Int("duration_us", int(time.Since(start).Microseconds())))
 				} else {
 					log.Error("story_job_failed", slog.String("reason", "invalid email in context"))
 				}
@@ -135,8 +135,8 @@ func (wp *WorkerPool) Submit(job repository.Job) {
 
 func (wp *WorkerPool) Stop() {
 	close(wp.JobQueue)
-	wp.Logger.Warn("job_channel_closed")
+	wp.Logger.Warn("story_job_channel_closed")
 	wp.Wg.Wait()
 	wp.CancelFunc()
-	wp.Logger.Warn("all_workers_canceled")
+	wp.Logger.Warn("all_story_workers_canceled")
 }

@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"runtime"
 	"syscall"
 	"time"
 
@@ -92,7 +93,7 @@ func main() {
 		if err != nil && !errors.Is(err, http.ErrServerClosed) {
 			logger.Error("failed to start the server", slog.String("reason", err.Error()))
 		}
-		logger.Info("succuesfully start the server")
+		logger.Info("successfully start the server")
 	}()
 
 	sigchan := make(chan os.Signal, 1)
@@ -102,7 +103,7 @@ func main() {
 	shutdownctx, shutdowncancelFunc := context.WithTimeout(context.Background(), time.Duration(cfg.ServerShutdownTimeout)*time.Second)
 	defer shutdowncancelFunc()
 	if err := server.Shutdown(shutdownctx); err != nil {
-		logger.Error("Server closed with error", slog.String("reason", err.Error()))
+		logger.Error("server closed with error", slog.String("reason", err.Error()))
 	}
 
 	workerPool.CancelFunc()
@@ -113,5 +114,6 @@ func main() {
 
 	close(workerPool.JobQueue)
 	close(resultchan)
+	logger.Info("check number of goroutine", slog.Int("number", runtime.NumGoroutine()))
 
 }

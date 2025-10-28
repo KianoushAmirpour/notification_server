@@ -25,11 +25,11 @@ func NewStoryGenerationService(users repository.UserRepository, storygen *ai.Gem
 
 func (s *StoryGenerationService) GenerateStory(ctx context.Context, userid int, logger *slog.Logger) (*domain.StoryRequestResponse, *domain.DomainError) {
 	start := time.Now()
-	log := logger.With(slog.String("service", "story_generateion"), slog.Int("user_id", userid))
+	log := logger.With(slog.String("service", "story_generation"), slog.Int("user_id", userid))
 
 	u, err := s.Users.GetUserByID(ctx, userid)
 	if err != nil {
-		log.Error("story_generateion_failed_get_user_by_id", slog.String("reason", err.Error()))
+		log.Error("story_generation_failed_get_user_by_id", slog.String("reason", err.Error()))
 		return nil, domain.NewDomainError(domain.ErrCodeNotFound, "user not found", err)
 	}
 
@@ -39,7 +39,7 @@ func (s *StoryGenerationService) GenerateStory(ctx context.Context, userid int, 
 
 	err = s.Users.SaveStoryMetaData(ctx, story)
 	if err != nil {
-		log.Error("story_generateion_failed_store_story_metadata", slog.String("reason", err.Error()))
+		log.Error("story_generation_failed_store_story_metadata", slog.String("reason", err.Error()))
 		return nil, domain.NewDomainError(domain.ErrCodeInternal, "failed to save save story meta data", err)
 	}
 
@@ -52,7 +52,7 @@ func (s *StoryGenerationService) GenerateStory(ctx context.Context, userid int, 
 	}
 
 	s.WorkerPool.Submit(job)
-	log.Info("push_to_jobqueue")
-	log.Info("story_generateion_successful", slog.Int("duration_us", int(time.Since(start).Microseconds())))
-	return &domain.StoryRequestResponse{Message: "Your story is being generated"}, nil
+	log.Info("push_to_story_generation_jobqueue")
+	log.Info("story_generation_successfully", slog.Int("duration_us", int(time.Since(start).Microseconds())))
+	return &domain.StoryRequestResponse{Message: "Your story is being generated. You wull be notified by email"}, nil
 }

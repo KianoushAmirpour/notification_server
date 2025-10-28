@@ -123,7 +123,7 @@ func (s *UserRegisterService) RegisterUser(ctx context.Context, req domain.Regis
 		return nil, domain.NewDomainError(domain.ErrCodeExternal, "failed to send otp code", err)
 	}
 
-	log.Info("register_user_successful", slog.Int("duration_us", int(time.Since(start).Microseconds())))
+	log.Info("register_user_successfully", slog.Int("duration_us", int(time.Since(start).Microseconds())))
 
 	return &domain.RegisterResponse{Message: "The verification code was sent to your email. Please check your email"}, nil
 
@@ -154,7 +154,7 @@ func (s *UserRegisterService) VerifyUser(ctx context.Context, req domain.Registe
 
 	err = s.Otp.VerifyOTP(ctx, email, UserSentOtp)
 	if err != nil {
-		log.Error("verify_user_failed_verufy_otp", slog.String("reason", err.Error()))
+		log.Error("verify_user_failed_verify_otp", slog.String("reason", err.Error()))
 		if errors.Is(err, domain.ErrInvalidOtp) {
 			return nil, domain.ErrInvalidOtp
 		} else if errors.Is(err, domain.ErrTooManyAttempts) {
@@ -188,7 +188,7 @@ func (s *UserRegisterService) VerifyUser(ctx context.Context, req domain.Registe
 		return nil, domain.NewDomainError(domain.ErrCodeInternal, "failed to verify user", err)
 	}
 
-	log.Info("verify_user_successful", slog.Int("duration_us", int(time.Since(start).Microseconds())))
+	log.Info("verify_user_successfully", slog.Int("duration_us", int(time.Since(start).Microseconds())))
 	return &domain.RegisterResponse{Message: "You are verified. Welcome 🥰. Lets explore🚀"}, nil
 
 }
@@ -196,17 +196,17 @@ func (s *UserRegisterService) VerifyUser(ctx context.Context, req domain.Registe
 func (s *UserRegisterService) AuthenticateUser(ctx context.Context, req domain.LoginUser, cfg *config.Config, logger *slog.Logger) (*domain.RegisterResponse, *domain.DomainError) {
 
 	start := time.Now()
-	log := logger.With(slog.String("service", "authenticate"), slog.String("email", req.Email))
+	log := logger.With(slog.String("service", "authentication"), slog.String("email", req.Email))
 
 	u, err := s.Users.GetByEmail(ctx, req.Email)
 	if err != nil {
-		log.Error("authenticate_failed_get_user_by_email", slog.String("reason", err.Error()))
+		log.Error("authentication_failed_get_user_by_email", slog.String("reason", err.Error()))
 		return nil, domain.NewDomainError(domain.ErrCodeNotFound, "user not found", err)
 	}
 
 	err = bcrypt.CompareHashAndPassword([]byte(u.Password), []byte(req.Password))
 	if err != nil {
-		log.Error("authenticate_failed_verify_user_password", slog.String("reason", err.Error()))
+		log.Error("authentication_failed_verify_user_password", slog.String("reason", err.Error()))
 		if err == bcrypt.ErrMismatchedHashAndPassword {
 			return nil, domain.NewDomainError(domain.ErrCodeValidation, "invalid credentials", err)
 		}
@@ -215,11 +215,11 @@ func (s *UserRegisterService) AuthenticateUser(ctx context.Context, req domain.L
 
 	token, err := adapters.CreateJWTToken(u.ID, u.Email, []byte(cfg.JwtSecret), cfg.JwtISS)
 	if err != nil {
-		log.Error("authenticate_failed_create_jwt", slog.String("reason", err.Error()))
+		log.Error("authentication_failed_create_jwt", slog.String("reason", err.Error()))
 		return nil, domain.NewDomainError(domain.ErrCodeInternal, "failed to generate jwt code", err)
 	}
 
-	log.Info("authenticate_successful", slog.Int("duration_us", int(time.Since(start).Microseconds())))
+	log.Info("authentication_successfully", slog.Int("duration_us", int(time.Since(start).Microseconds())))
 	return &domain.RegisterResponse{Message: token}, nil
 
 }
@@ -233,5 +233,5 @@ func (s *UserRegisterService) DeleteUser(ctx context.Context, req domain.User, l
 		return nil, domain.NewDomainError(domain.ErrCodeNotFound, "user not found", err)
 	}
 	log.Info("delete_user_completed", slog.Int("duration_us", int(time.Since(start).Microseconds())))
-	return &domain.RegisterResponse{Message: "User deleted succussfully"}, nil
+	return &domain.RegisterResponse{Message: "User deleted successfully"}, nil
 }

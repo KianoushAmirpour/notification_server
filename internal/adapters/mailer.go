@@ -27,10 +27,11 @@ func (m Mailer) SendVerification(email string, otp int) error {
 	dialer := gomail.NewDialer(m.Host, m.Port, m.Username, m.Password)
 
 	if err := dialer.DialAndSend(message); err != nil {
+		m.Logger.Error("verification_email_failed", slog.String("to", email), slog.String("reason", err.Error()))
 		return err
 	} else {
 		// fmt.Println("HTML Email sent successfully with a plain-text alternative!")
-		m.Logger.Info("verification_email_sent", slog.String("to", email))
+		m.Logger.Info("verification_email_sent_successfully", slog.String("to", email))
 		return nil
 	}
 
@@ -47,10 +48,11 @@ func (m Mailer) SendNotification(email string) error {
 	dialer := gomail.NewDialer(m.Host, m.Port, m.Username, m.Password)
 
 	if err := dialer.DialAndSend(message); err != nil {
+		m.Logger.Error("notification_email_failed", slog.String("to", email), slog.String("reason", err.Error()))
 		return err
 	} else {
 		// fmt.Println("HTML Email sent successfully with a plain-text alternative!")
-		m.Logger.Info("notification_email_sent", slog.String("to", email))
+		m.Logger.Info("notification_email_sent_successfully", slog.String("to", email))
 		return nil
 	}
 
