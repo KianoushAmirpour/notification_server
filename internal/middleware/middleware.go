@@ -252,7 +252,7 @@ func UserPreferencesValidation(fl validator.FieldLevel) bool {
 func RateLimiterMiddelware(ipratelimiter *adapters.IPRateLimiter, capacity, fillrate float64, logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
-		log := logger.With(slog.String("service", "rate_limit"), slog.String("request_id", c.GetString("RequestID")))
+		log := logger.With(slog.String("service", "rate_limiter"), slog.String("request_id", c.GetString("RequestID")))
 		if ip == "" {
 			log.Warn("extract_user_ip", slog.String("reason", "invalid_user_ip"))
 			httpErr := transport.HttpError{Message: "invalid ip", Code: domain.ErrCodeValidation, StatusCode: http.StatusBadRequest}

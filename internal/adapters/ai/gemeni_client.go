@@ -28,7 +28,7 @@ func (g GemeniClient) GenerateStory(ctx context.Context, preferences string) (st
 	result, err := g.Client.Models.GenerateContent(
 		ctx,
 		g.Cfg.GemeniModel,
-		genai.Text(fmt.Sprintf("Create a story about %s with fancey theme", preferences)),
+		genai.Text(fmt.Sprintf("create a story about %s with fancy theme", preferences)),
 		nil)
 
 	if err != nil {
