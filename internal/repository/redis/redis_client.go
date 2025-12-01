@@ -51,7 +51,7 @@ func (r RedisClient) SaveOTP(ctx context.Context, email string, otp, expiration 
 	if err != nil {
 		return err
 	}
-	setexpiration := r.Client.HExpire(ctx, key, time.Minute*2, "otp", "retry_count")
+	setexpiration := r.Client.HExpire(ctx, key, time.Second*time.Duration(expiration), "otp", "retry_count")
 
 	err = setexpiration.Err()
 	if err != nil {

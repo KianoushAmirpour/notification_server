@@ -6,6 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/KianoushAmirpour/notification_server/internal/config"
+	"github.com/KianoushAmirpour/notification_server/internal/domain"
 	"google.golang.org/genai"
 )
 
@@ -28,7 +29,7 @@ func (g GemeniClient) GenerateStory(ctx context.Context, preferences string) (st
 	result, err := g.Client.Models.GenerateContent(
 		ctx,
 		g.Cfg.GemeniModel,
-		genai.Text(fmt.Sprintf("create a story about %s with fancy theme", preferences)),
+		genai.Text(fmt.Sprintf(domain.StoryGenerationPrompt, preferences)),
 		nil)
 
 	if err != nil {
