@@ -17,34 +17,44 @@ type RouterConfig struct {
 func SetupRoutes(config RouterConfig) *gin.Engine {
 
 	g := gin.Default()
-	g.Use(cors.New(cors.Config{
-		AllowOrigins:     []string{"https://*", "http://*"},
-		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
-		AllowHeaders:     []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
-		AllowCredentials: true,
-		MaxAge:           12 * time.Hour,
-	}), middleware.AddRequestID(), middleware.LoggingRequestMiddleware(config.UserHandler.Logger), middleware.PanicRecoveryMiddleware(config.UserHandler.Logger))
+	g.Use(
+		cors.New(cors.Config{
+			AllowOrigins:     []string{"https://*", "http://*"},
+			AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+			AllowHeaders:     []string{"Accept", "Authorization", "Content-Type", "X-CSRF-Token"},
+			AllowCredentials: true,
+			MaxAge:           12 * time.Hour,
+		}),
+		middleware.PanicRecoveryMiddleware(config.UserHandler.Logger),
+		middleware.RateLimiterMiddelware(
+			config.UserHandler.IpRateLimiter,
+			config.UserHandler.Config.RataLimitCapacity,
+			config.UserHandler.Config.RataLimitFillRate,
+			config.UserHandler.Logger),
+		middleware.AddRequestID(),
+		middleware.LoggingRequestMiddleware(config.UserHandler.Logger),
+		middleware.CheckContentType(),
+	)
 
-	protectedGroup := g.Group("/api", middleware.AuthenticateMiddleware([]byte(config.UserHandler.Config.JwtSecret)))
+	// protected routes
+	protected := g.Group("")
+	protected.Use(middleware.AuthenticateMiddleware([]byte(config.UserHandler.Config.JwtSecret)))
 	{
-		protectedGroup.Handle("DELETE", "/users", middleware.CheckContentType(), middleware.RegisterMiddelware[domain.User](config.UserHandler.Config.MaxAllowedSize), config.UserHandler.DeleteUserHandler)
-		protectedGroup.Handle("POST", "/stories/generate",
-			middleware.RateLimiterMiddelware(config.UserHandler.IpRateLimiter,
-				config.UserHandler.Config.RataLimitCapacity, config.UserHandler.Config.RataLimitFillRate, config.UserHandler.Logger),
-			config.UserHandler.StoryGenerationHandler)
+		protected.Handle("DELETE", "/users", middleware.CheckContentBody[domain.User](config.UserHandler.Config.MaxAllowedSize), config.UserHandler.DeleteUserHandler)
+		protected.Handle("POST", "/stories", config.UserHandler.StoryGenerationHandler)
 	}
 
-	api := g.Group("/api", middleware.CheckContentType(), middleware.RateLimiterMiddelware(config.UserHandler.IpRateLimiter,
-		config.UserHandler.Config.RataLimitCapacity, config.UserHandler.Config.RataLimitFillRate, config.UserHandler.Logger))
+	// auth and register routes
+	auth := g.Group("/auth")
 	{
-
-		api.Handle("POST", "/users/register", middleware.RegisterMiddelware[domain.RegisteredUser](config.UserHandler.Config.MaxAllowedSize), middleware.AddCorrelationID(), config.UserHandler.RegisterHandler)
-		api.Handle("POST", "/users/verify", middleware.RegisterMiddelware[domain.RegisterVerify](config.UserHandler.Config.MaxAllowedSize), config.UserHandler.VerificationHandler)
-		api.Handle("POST", "/users/login", middleware.RegisterMiddelware[domain.LoginUser](config.UserHandler.Config.MaxAllowedSize), config.UserHandler.LoginHandler)
+		auth.Handle("POST", "/register", middleware.CheckContentBody[domain.RegisteredUser](config.UserHandler.Config.MaxAllowedSize), middleware.AddCorrelationID(), config.UserHandler.RegisterHandler)
+		auth.Handle("POST", "/verify", middleware.CheckContentBody[domain.RegisterVerify](config.UserHandler.Config.MaxAllowedSize), config.UserHandler.VerificationHandler)
+		auth.Handle("POST", "/login", middleware.CheckContentBody[domain.LoginUser](config.UserHandler.Config.MaxAllowedSize), config.UserHandler.LoginHandler)
 	}
 
-	g.Handle("GET", "/api/home", config.UserHandler.HomePageHandler)
-	g.Handle("GET", "/api/health", config.UserHandler.HealthHandler)
+	// public routes
+	g.Handle("GET", "/home", config.UserHandler.HomePageHandler)
+	g.Handle("GET", "/health", config.UserHandler.HealthHandler)
 
 	return g
 

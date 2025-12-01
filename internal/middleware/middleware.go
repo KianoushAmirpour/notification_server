@@ -86,7 +86,7 @@ func CheckContentType() gin.HandlerFunc {
 	}
 }
 
-func RegisterMiddelware[T any](maxsize int) gin.HandlerFunc {
+func CheckContentBody[T any](maxsize int) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		c.Request.Body = http.MaxBytesReader(c.Writer, c.Request.Body, int64(maxsize))
