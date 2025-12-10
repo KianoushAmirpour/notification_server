@@ -2,7 +2,7 @@
 
 A Go + Gin web service that generates personalized stories based on user preferences, using a **worker pool architecture, Redis for OTP, and PostgreSQL**.    
 
-This project demonstrates a backend structure featuring **repository pattern, rate limiting, structured logging, JWT authentication, config management, health checks, and background job processing**.  
+This project demonstrates a backend structure featuring **Clean architecture, rate limiting, structured logging, JWT authentication, config management, health checks, and background job processing**.  
 
 ## Core Functionality
 

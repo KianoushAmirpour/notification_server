@@ -1,39 +1,46 @@
 package domain
 
-import "github.com/golang-jwt/jwt/v5"
+import (
+	"context"
+)
 
 type User struct {
-	ID          int      `json:"id" validate:"gte=0"`
-	FirstName   string   `json:"first_name"`
-	LastName    string   `json:"last_name"`
-	Email       string   `json:"email"`
-	Password    string   `json:"password"`
-	Preferences []string `json:"preferences"`
+	ID          int
+	FirstName   string
+	LastName    string
+	Email       string
+	Password    string
+	Preferences []string
 }
 
 type RegisteredUser struct {
-	FirstName   string   `json:"first_name" validate:"required"`
-	LastName    string   `json:"last_name" validate:"required"`
-	Email       string   `json:"email" validate:"required,email"`
-	Password    string   `json:"password" validate:"required,min=8,max=64,passwod_strength"`
-	Preferences []string `json:"preferences" validate:"required,unique,user_preferences_check"`
-}
-
-type RegisterResponse struct {
-	Message string `json:"message"`
+	FirstName   string
+	LastName    string
+	Email       string
+	Password    string
+	Preferences []string
 }
 
 type RegisterVerify struct {
-	SentOtpbyUser string `json:"otp" validate:"required"`
+	SentOtpbyUser string
 }
 
 type LoginUser struct {
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required"`
+	Email    string
+	Password string
 }
 
-type CustomClaims struct {
-	UserID int
-	Email  string
-	jwt.RegisteredClaims
+type UserRepository interface {
+	GetUserByID(ctx context.Context, id int) (*User, error)
+	DeleteUserByID(ctx context.Context, id int) error
+	GetUserByEmail(ctx context.Context, email string) (*User, error)
+}
+
+type UserVerificationRepository interface {
+	CreateUser(ctx context.Context, u *User) error
+	SaveVerificationData(ctx context.Context, reqid, email string) error
+	RetrieveVerificationData(ctx context.Context, reqid string) (string, error)
+	MoveUserFromStaging(ctx context.Context, email string) error
+	DeleteUserFromStaging(ctx context.Context, email string) error
+	DeleteUserVerificationData(ctx context.Context, email string) error
 }
