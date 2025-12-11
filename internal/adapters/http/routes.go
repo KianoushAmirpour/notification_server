@@ -50,12 +50,13 @@ func SetupRoutes(config RouterConfig) *gin.Engine {
 		auth.Handle("POST", "/register", middleware.CheckContentBody[dto.RegisteredUser](config.UserHandler.MaxAllowedSize), middleware.AddCorrelationID(), config.UserHandler.RegisterHandler)
 		auth.Handle("POST", "/verify", middleware.CheckContentBody[dto.RegisterVerify](config.UserHandler.MaxAllowedSize), config.UserHandler.VerificationHandler)
 		auth.Handle("POST", "/login", middleware.CheckContentBody[dto.LoginUser](config.UserHandler.MaxAllowedSize), config.UserHandler.LoginHandler)
+
 	}
 
 	// public routes
 	g.Handle("GET", "/home", config.UserHandler.HomePageHandler)
 	g.Handle("GET", "/health", config.UserHandler.HealthHandler)
-
+	g.Handle("POST", "/refresh", config.UserHandler.JwtRefreshHandler)
 	return g
 
 }

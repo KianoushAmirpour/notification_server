@@ -12,10 +12,11 @@ import (
 
 type RedisClient struct {
 	Client *redis.Client
+	Hasher domain.HashRepository
 }
 
-func NewRedisClient(Client *redis.Client) *RedisClient {
-	return &RedisClient{Client: Client}
+func NewRedisClient(Client *redis.Client, hasher domain.HashRepository) *RedisClient {
+	return &RedisClient{Client: Client, Hasher: hasher}
 }
 
 func ConnectToRedis(addr string, database int) (*redis.Client, error) {
@@ -36,13 +37,12 @@ func ConnectToRedis(addr string, database int) (*redis.Client, error) {
 
 }
 
-func (r RedisClient) SaveOTP(ctx context.Context, email string, otp, expiration int) error {
+func (r RedisClient) SaveOTP(ctx context.Context, email string, otp string, expiration int) error {
 
 	userdata := struct {
 		useremail string
-		otp       int
+		otp       string
 	}{useremail: email, otp: otp}
-
 	key := fmt.Sprintf("users:%s", userdata.useremail)
 	// setResult := rdb.Set(ctx, key, userdata.otp, time.Minute*2)
 
@@ -61,7 +61,7 @@ func (r RedisClient) SaveOTP(ctx context.Context, email string, otp, expiration 
 
 }
 
-func (r RedisClient) VerifyOTP(ctx context.Context, email string, sentopt int) error {
+func (r RedisClient) VerifyOTP(ctx context.Context, email string, sentopt string) error {
 
 	key := fmt.Sprintf("users:%s", email)
 	// userdata, err := rdb.Get(ctx, key).Result()
@@ -75,10 +75,7 @@ func (r RedisClient) VerifyOTP(ctx context.Context, email string, sentopt int) e
 		return domain.ErrOtpKeyNotFound
 	}
 
-	storedOtp, err := strconv.Atoi(userData["otp"])
-	if err != nil {
-		return domain.ErrTypeConvertion
-	}
+	storedOtp := userData["otp"]
 
 	tries, _ := strconv.Atoi(userData["retry_count"])
 
@@ -88,7 +85,8 @@ func (r RedisClient) VerifyOTP(ctx context.Context, email string, sentopt int) e
 
 	}
 
-	if storedOtp != sentopt {
+	err = r.Hasher.VerifyHash([]byte(storedOtp), sentopt, false)
+	if err != nil {
 		retryset := r.Client.HIncrBy(ctx, key, "retry_count", 1)
 		if retryset.Err() != nil {
 			return domain.ErrFailedIncrementOtpRetry

@@ -3,10 +3,10 @@ package domain
 import "context"
 
 type OTPService interface {
-	SaveOTP(ctx context.Context, email string, otp, expiration int) error
-	VerifyOTP(ctx context.Context, email string, sentopt int) error
+	SaveOTP(ctx context.Context, email string, otp string, expiration int) error
+	VerifyOTP(ctx context.Context, email string, sentopt string) error
 }
 
 type OTPGenerator interface {
-	GenerateOTP() (int, error)
+	GenerateOTP() (string, error)
 }

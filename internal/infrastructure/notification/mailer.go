@@ -16,13 +16,13 @@ type Mailer struct {
 	Logger    domain.LoggingRepository
 }
 
-func (m Mailer) SendVerificationEmail(email string, otp int) error {
+func (m Mailer) SendVerificationEmail(email string, otp string) error {
 	message := gomail.NewMessage()
 	message.SetHeader("From", m.FromEmail)
 	message.SetHeader("To", email)
 	message.SetHeader("Subject", "verificatoin code")
 
-	message.SetBody("text/plain", fmt.Sprintf("Thanks for your register. your code is %d", otp))
+	message.SetBody("text/plain", fmt.Sprintf("Thanks for your register. your code is %s", otp))
 
 	dialer := gomail.NewDialer(m.Host, m.Port, m.Username, m.Password)
 

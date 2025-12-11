@@ -55,4 +55,6 @@ var (
 	ErrTypeConvertion          = &DomainError{Code: ErrCodeValidation, Message: "failed to convert the type", Cause: nil}
 	ErrFailedIncrementOtpRetry = &DomainError{Code: ErrCodeInternal, Message: "failed to increment the retry attempts", Cause: nil}
 	ErrInvalidJWTToken         = &DomainError{Code: ErrCodeUnauthorized, Message: "invalid jwt token", Cause: nil}
+	ErrInvalidJWTMethod        = &DomainError{Code: ErrCodeUnauthorized, Message: "invalid jwt method", Cause: nil}
+	ErrPersistRefreshToken     = &DomainError{Code: ErrCodePersisting, Message: "persisting refresh token failed", Cause: nil}
 )

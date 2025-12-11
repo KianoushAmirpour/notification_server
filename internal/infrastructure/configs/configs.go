@@ -11,7 +11,8 @@ type Config struct {
 	DatabaseDSN           string  `mapstructure:"DB_DSN" validate:"required"`
 	RedisPort             int     `mapstructure:"REDIS_PORT" validate:"required,gte=1023,lte=65535"`
 	RedisDB               int     `mapstructure:"REDIS_DB" validate:"gte=0,lte=16"`
-	JwtSecret             string  `mapstructure:"JWT_SECRET" validate:"required,min=32"`
+	JwtAccessSecret       string  `mapstructure:"JWT_ACCESS_SECRET" validate:"required,min=32"`
+	JwtRefreshSecret      string  `mapstructure:"JWT_REFRESH_SECRET" validate:"required,min=32"`
 	SmtpHost              string  `mapstructure:"SMTP_HOST" validate:"required"`
 	SmtpPort              int     `mapstructure:"SMTP_PORT" validate:"required"`
 	SmtpUsername          string  `mapstructure:"SMTP_USERNAME" validate:"required"`

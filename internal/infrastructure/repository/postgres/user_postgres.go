@@ -3,8 +3,10 @@ package postgres
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/KianoushAmirpour/notification_server/internal/domain"
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 )
@@ -29,6 +31,10 @@ type StoryRepo struct {
 	Db *pgxpool.Pool
 }
 
+type RefreshTokenRepo struct {
+	Db *pgxpool.Pool
+}
+
 // func NewPostgresUserRepo(db *pgx.Conn) *PostgresUserRepo {
 // 	return &PostgresUserRepo{Db: db}
 // }
@@ -43,6 +49,10 @@ func NewUserVerificationRepo(db *pgxpool.Pool) *UserVerificationRepo {
 
 func NewStoryRepo(db *pgxpool.Pool) *StoryRepo {
 	return &StoryRepo{db}
+}
+
+func NewRefreshTokenRepo(db *pgxpool.Pool) *RefreshTokenRepo {
+	return &RefreshTokenRepo{db}
 }
 
 func OpenDatabaseConnPool(dsn string) (*pgxpool.Pool, error) {
@@ -253,6 +263,77 @@ func (s *StoryRepo) Upload(ctx context.Context, story *domain.UploadStory) error
 	err := row.Scan(&returnedID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.ErrUserNotFound
+	}
+	if err != nil {
+		return domain.NewDomainError(domain.ErrCodeInternal, "query failed", err)
+	}
+	return nil
+}
+
+func (r *RefreshTokenRepo) StoreRefreshToken(ctx context.Context, userID int, tokenHash string, expiresAt time.Time) error {
+	query := `
+	insert into refresh_tokens
+	(user_id, token_hash, expires_at)
+	values ($1, $2, $3)
+	returning id
+	`
+	var returnedID uuid.UUID
+
+	row := r.Db.QueryRow(ctx, query, userID, tokenHash, expiresAt)
+	err := row.Scan(&returnedID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.ErrPersistRefreshToken
+	}
+	if err != nil {
+		return domain.NewDomainError(domain.ErrCodeInternal, "query failed", err)
+	}
+	return nil
+}
+
+func (r *RefreshTokenRepo) RetrieveRefreshToken(ctx context.Context, userID int) (*domain.RefreshToken, error) {
+	query := `
+	SELECT 
+        id::text,
+        user_id,
+        token_hash,
+        expires_at,
+        revoked_at,
+        created_at
+    FROM refresh_tokens
+    WHERE user_id = $1
+	AND revoked_at IS NULL
+	ORDER BY created_at DESC
+	LIMIT 1;
+	`
+	var refreshToken domain.RefreshToken
+
+	row := r.Db.QueryRow(ctx, query, userID)
+	err := row.Scan(&refreshToken.ID, &refreshToken.UserID, &refreshToken.HashedToken, &refreshToken.ExpiredAt, &refreshToken.RevokedAt, &refreshToken.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, domain.ErrUserNotFound
+	}
+	if err != nil {
+		return nil, domain.NewDomainError(domain.ErrCodeInternal, "query failed", err)
+	}
+	return &refreshToken, nil
+}
+
+func (r *RefreshTokenRepo) UpdateRefreshToken(ctx context.Context, userID int, revokedAt time.Time) error {
+	query := `
+	UPDATE refresh_tokens
+	SET 
+		revoked_at = $2
+	WHERE user_id = $1
+	AND revoked_at IS NULL
+	ORDER BY created_at DESC
+	LIMIT 1;
+	`
+	var returnedID uuid.UUID
+
+	row := r.Db.QueryRow(ctx, query, userID, revokedAt)
+	err := row.Scan(&returnedID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.ErrPersistRefreshToken
 	}
 	if err != nil {
 		return domain.NewDomainError(domain.ErrCodeInternal, "query failed", err)

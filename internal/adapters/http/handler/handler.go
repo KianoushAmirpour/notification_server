@@ -25,6 +25,7 @@ type UserHandler struct {
 	OtpExpiration     int
 	JwtIss            string
 	JwtSecret         string
+	JwtRefresh        string
 	RateLimitCapacity float64
 	RateLimitFillRate float64
 	MaxAllowedSize    int
@@ -39,12 +40,13 @@ func NewUserHandler(
 	otpexpiration int,
 	jwtiss string,
 	jwtsecret string,
+	jwtrefresh string,
 	ratelimitcapacity float64,
 	ratelimitfillrate float64,
 	maxallowedsize int,
 ) *UserHandler {
 	return &UserHandler{UserSvc: usersvc, ImageSvc: imgsvc, IpRateLimiter: i, JwtHandler: auth, Logger: logger,
-		OtpExpiration: otpexpiration, JwtIss: jwtiss, JwtSecret: jwtsecret,
+		OtpExpiration: otpexpiration, JwtIss: jwtiss, JwtSecret: jwtsecret, JwtRefresh: jwtrefresh,
 		RateLimitCapacity: ratelimitcapacity, RateLimitFillRate: ratelimitfillrate, MaxAllowedSize: maxallowedsize}
 }
 
@@ -97,23 +99,39 @@ func (h *UserHandler) VerificationHandler(c *gin.Context) {
 func (h *UserHandler) LoginHandler(c *gin.Context) {
 	req := c.MustGet("payload").(dto.LoginUser)
 
-	requLu := domain.LoginUser{
+	reqLu := domain.LoginUser{
 		Email:    req.Email,
 		Password: req.Password,
 	}
 
-	resp, err := h.UserSvc.AuthenticateUser(c.Request.Context(), requLu, h.JwtIss, h.JwtSecret)
+	resp, err := h.UserSvc.AuthenticateUser(c.Request.Context(), reqLu)
 	if err != nil {
 		httpErr := utils.MapErr(err)
 		c.JSON(httpErr.StatusCode, httpErr)
 		// c.Redirect(http.StatusSeeOther, "http://localhost:4000/api/user/register")
 		return
 	}
-	c.Header("Authorization", "Bearer "+resp.Message)
+	c.Header("Authorization", "Bearer "+resp.AccessToken)
+	c.Header("X-Refresh-Token", resp.RefreshToken)
 	h.Logger.Info("http_request_end", "request_id", c.GetString("RequestID"), "status", http.StatusCreated)
 	c.JSON(http.StatusCreated, gin.H{"Message": "You are logged in"})
 
 	// c.SetCookie("access-token", token, 3600, "/", "", true, true)
+}
+
+func (h *UserHandler) JwtRefreshHandler(c *gin.Context) {
+	refreshToken := c.GetHeader("X-Refresh-Token")
+	resp, err := h.UserSvc.RefreshJwtToken(c.Request.Context(), refreshToken, h.JwtRefresh)
+	if err != nil {
+		httpErr := utils.MapErr(err)
+		c.JSON(httpErr.StatusCode, httpErr)
+		return
+	}
+	c.Header("Authorization", "Bearer "+resp.AccessToken)
+	c.Header("X-Refresh-Token", resp.RefreshToken)
+	h.Logger.Info("http_request_end", "request_id", c.GetString("RequestID"), "status", http.StatusCreated)
+	c.JSON(http.StatusCreated, gin.H{"Message": "You are logged in"})
+
 }
 
 func (h *UserHandler) DeleteUserHandler(c *gin.Context) {

@@ -3,7 +3,6 @@ package usecase
 import (
 	"context"
 	"log/slog"
-	"strconv"
 	"time"
 
 	"github.com/KianoushAmirpour/notification_server/internal/domain"
@@ -13,36 +12,44 @@ type UserServiceResponse struct {
 	Message string `json:"message"`
 }
 
+type UserServiceAuthResponse struct {
+	AccessToken  string `json:"access_token"`
+	RefreshToken string `json:"refresh_token"`
+}
+
 type UserService struct {
-	Users            domain.UserRepository
-	UserVerification domain.UserVerificationRepository
-	PasswordHandler  domain.Password
-	MailHandler      domain.Mailer
-	OtpHandler       domain.OTPService
-	OtpGenerator     domain.OTPGenerator
-	JwtTokenHandler  domain.JwtTokenRepository
-	Logger           domain.LoggingRepository
+	Users               domain.UserRepository
+	UserVerification    domain.UserVerificationRepository
+	HashHandler         domain.HashRepository
+	MailHandler         domain.Mailer
+	OtpHandler          domain.OTPService
+	OtpGenerator        domain.OTPGenerator
+	JwtTokenHandler     domain.JwtTokenRepository
+	RefreshTokenHandler domain.RefreshTokenRepository
+	Logger              domain.LoggingRepository
 }
 
 func NewUserRegisterService(
 	users domain.UserRepository,
 	userVerification domain.UserVerificationRepository,
-	passwordhandler domain.Password,
+	hashHandler domain.HashRepository,
 	mailhandler domain.Mailer,
 	otphandler domain.OTPService,
 	otpgenerator domain.OTPGenerator,
 	jwttoken domain.JwtTokenRepository,
+	reftoken domain.RefreshTokenRepository,
 	logger domain.LoggingRepository,
 ) *UserService {
 	return &UserService{
-		Users:            users,
-		UserVerification: userVerification,
-		PasswordHandler:  passwordhandler,
-		MailHandler:      mailhandler,
-		OtpHandler:       otphandler,
-		OtpGenerator:     otpgenerator,
-		JwtTokenHandler:  jwttoken,
-		Logger:           logger}
+		Users:               users,
+		UserVerification:    userVerification,
+		HashHandler:         hashHandler,
+		MailHandler:         mailhandler,
+		OtpHandler:          otphandler,
+		OtpGenerator:        otpgenerator,
+		JwtTokenHandler:     jwttoken,
+		RefreshTokenHandler: reftoken,
+		Logger:              logger}
 }
 
 func (s *UserService) RegisterUser(ctx context.Context, req domain.RegisteredUser, reqid string, otpExpiration int) (*UserServiceResponse, error) {
@@ -59,7 +66,7 @@ func (s *UserService) RegisterUser(ctx context.Context, req domain.RegisteredUse
 		return nil, domain.NewDomainError(domain.ErrCodeConflict, "email already exists", nil)
 	}
 
-	hashedPassword, err := s.PasswordHandler.HashPassword(req.Password)
+	hashedPassword, err := s.HashHandler.Hash(req.Password, false)
 	if err != nil {
 		log.Error("register_user_failed",
 			"step", "hash_password",
@@ -92,6 +99,11 @@ func (s *UserService) RegisterUser(ctx context.Context, req domain.RegisteredUse
 		return nil, err
 	}
 
+	hashedOtp, err := s.HashHandler.Hash(otp, false)
+	if err != nil {
+		log.Error("register_user_failed_hash_otp", "reason", err.Error())
+		return nil, err
+	}
 	timeoutCtx, cancelFunc := context.WithTimeout(ctx, time.Duration(5*time.Second))
 	defer cancelFunc()
 
@@ -99,7 +111,7 @@ func (s *UserService) RegisterUser(ctx context.Context, req domain.RegisteredUse
 	emailErrChan := make(chan error, 1)
 
 	go func() {
-		otperr := s.OtpHandler.SaveOTP(timeoutCtx, req.Email, otp, otpExpiration)
+		otperr := s.OtpHandler.SaveOTP(timeoutCtx, req.Email, hashedOtp, otpExpiration)
 		if err != nil {
 			otpErrChan <- otperr
 		}
@@ -107,7 +119,7 @@ func (s *UserService) RegisterUser(ctx context.Context, req domain.RegisteredUse
 	}()
 
 	go func() {
-		<-time.After(5 * time.Second)
+		<-time.After(1 * time.Second)
 		emailerr := s.MailHandler.SendVerificationEmail(req.Email, otp)
 		if emailerr != nil {
 			emailErrChan <- emailerr
@@ -138,11 +150,11 @@ func (s *UserService) VerifyUser(ctx context.Context, req domain.RegisterVerify,
 	start := time.Now()
 	log := s.Logger.With("service", "verify_user", "request_id", reqid)
 
-	UserSentOtp, err := strconv.Atoi(req.SentOtpbyUser)
-	if err != nil {
-		log.Error("verify_user_failed_converting_otp_to_int", "reason", err.Error())
-		return nil, domain.ErrTypeConvertion
-	}
+	// UserSentOtp, err := strconv.Atoi(req.SentOtpbyUser)
+	// if err != nil {
+	// 	log.Error("verify_user_failed_converting_otp_to_int", "reason", err.Error())
+	// 	return nil, domain.ErrTypeConvertion
+	// }
 
 	email, err := s.UserVerification.RetrieveVerificationData(ctx, reqid)
 	if err != nil {
@@ -150,7 +162,7 @@ func (s *UserService) VerifyUser(ctx context.Context, req domain.RegisterVerify,
 		return nil, err
 	}
 
-	err = s.OtpHandler.VerifyOTP(ctx, email, UserSentOtp)
+	err = s.OtpHandler.VerifyOTP(ctx, email, req.SentOtpbyUser)
 	if err != nil {
 		log.Error("verify_user_failed_verify_otp", "reason", err.Error())
 		return nil, err
@@ -178,7 +190,7 @@ func (s *UserService) VerifyUser(ctx context.Context, req domain.RegisterVerify,
 
 }
 
-func (s *UserService) AuthenticateUser(ctx context.Context, req domain.LoginUser, jwtIss, jwtSecret string) (*UserServiceResponse, error) {
+func (s *UserService) AuthenticateUser(ctx context.Context, req domain.LoginUser) (*UserServiceAuthResponse, error) {
 
 	start := time.Now()
 	log := s.Logger.With(slog.String("service", "authentication"), slog.String("email", req.Email))
@@ -189,20 +201,33 @@ func (s *UserService) AuthenticateUser(ctx context.Context, req domain.LoginUser
 		return nil, err
 	}
 
-	err = s.PasswordHandler.VerifyPassword([]byte(u.Password), []byte(req.Password))
+	err = s.HashHandler.VerifyHash([]byte(u.Password), req.Password, false)
 	if err != nil {
 		log.Error("authentication_failed_verify_user_password", "reason", err.Error())
 		return nil, err
 	}
 
-	token, err := s.JwtTokenHandler.CreateJWTToken(u.ID, u.Email)
+	tokenPair, err := s.JwtTokenHandler.CreateJWTToken(u.ID, u.Email)
 	if err != nil {
 		log.Error("authentication_failed_create_jwt", "reason", err.Error())
 		return nil, err
 	}
 
+	refreshTokenHash, err := s.HashHandler.Hash(tokenPair.RefreshToken, true)
+	if err != nil {
+		log.Error("authentication_failed_hash_refresh_token",
+			"reason", err.Error())
+		return nil, err
+	}
+
+	err = s.RefreshTokenHandler.StoreRefreshToken(ctx, u.ID, refreshTokenHash, time.Now().Add(time.Hour*24*7))
+	if err != nil {
+		log.Error("authentication_failed_persist_refresh_token", "reason", err.Error())
+		return nil, err
+	}
+
 	log.Info("authentication_successfully", "duration_us", int(time.Since(start).Microseconds()))
-	return &UserServiceResponse{Message: token}, nil
+	return &UserServiceAuthResponse{AccessToken: tokenPair.AccessToken, RefreshToken: tokenPair.RefreshToken}, nil
 
 }
 
@@ -216,4 +241,68 @@ func (s *UserService) DeleteUser(ctx context.Context, req domain.User) (*UserSer
 	}
 	log.Info("delete_user_completed", "duration_us", int(time.Since(start).Microseconds()))
 	return &UserServiceResponse{Message: "User deleted successfully"}, nil
+}
+
+func (s *UserService) RefreshJwtToken(ctx context.Context, refreshToken string, JwtRefreshSecret string) (*UserServiceAuthResponse, error) {
+	start := time.Now()
+	log := s.Logger.With("service", "refresh_jwt")
+	token, err := s.JwtTokenHandler.VerifyRefreshToken(refreshToken, []byte(JwtRefreshSecret))
+	if err != nil {
+		log.Error("verifying_refresh_jwt_failed", "reason", err.Error())
+		return nil, err
+	}
+	user, err := s.Users.GetUserByID(ctx, token.UserID)
+	if err != nil {
+		log.Error("finding_user_by_id_failed", "reason", err.Error())
+		return nil, err
+	}
+	dbReftoken, err := s.RefreshTokenHandler.RetrieveRefreshToken(ctx, user.ID)
+	if err != nil {
+		log.Error("finding_refresh_token_by_user_id_failed", "reason", err.Error())
+		return nil, err
+	}
+
+	err = s.HashHandler.VerifyHash([]byte(dbReftoken.HashedToken), refreshToken, true)
+	if err != nil {
+		log.Error("verifying_hashed_token_failed", "reason", err.Error())
+		return nil, err
+	}
+
+	if dbReftoken.ExpiredAt.Before(time.Now()) {
+		log.Error("verifying_refrsh_token_failed", "reason", "refresh token expired")
+		return nil, domain.NewDomainError(domain.ErrCodeValidation, "refresh token expired", nil)
+	}
+
+	if dbReftoken.RevokedAt != nil {
+		log.Error("verifying_refrsh_token_failed", "reason", "refresh token revoked")
+		return nil, domain.NewDomainError(domain.ErrCodeValidation, "refresh token revoked", nil)
+	}
+
+	tokenPair, err := s.JwtTokenHandler.CreateJWTToken(token.UserID, token.Email)
+	if err != nil {
+		log.Error("refresh_jwt_failed_create_jwt", "reason", err.Error())
+		return nil, err
+	}
+
+	refreshTokenHash, err := s.HashHandler.Hash(tokenPair.RefreshToken, true)
+	if err != nil {
+		log.Error("hashing_refresh_token_failed",
+			"reason", err.Error())
+		return nil, err
+	}
+
+	err = s.RefreshTokenHandler.UpdateRefreshToken(ctx, user.ID, time.Now())
+	if err != nil {
+		log.Error("revoking_old_refresh_token_failed", "reason", err.Error())
+		return nil, err
+	}
+
+	err = s.RefreshTokenHandler.StoreRefreshToken(ctx, user.ID, refreshTokenHash, time.Now().Add(time.Hour*24*7))
+	if err != nil {
+		log.Error("authentication_failed_persist_refresh_token", "reason", err.Error())
+		return nil, err
+	}
+
+	log.Info("refresh_jwt_token_completed", "duration_us", int(time.Since(start).Microseconds()))
+	return &UserServiceAuthResponse{AccessToken: tokenPair.AccessToken, RefreshToken: tokenPair.RefreshToken}, nil
 }

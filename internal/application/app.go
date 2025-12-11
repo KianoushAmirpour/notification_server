@@ -52,9 +52,9 @@ func (a App) Run() {
 	}
 	defer redisConn.Close()
 
-	otpService := redis.NewRedisClient(redisConn)
-
 	bcryptHasher := security.Hasher{Cost: a.Cfg.BcryptCost}
+
+	otpService := redis.NewRedisClient(redisConn, bcryptHasher)
 
 	mailer := notification.Mailer{
 		Host:      a.Cfg.SmtpHost,
@@ -69,12 +69,13 @@ func (a App) Run() {
 	UserRepo := postgres.NewUserRepo(dbPool)
 	UserVerificationRepo := postgres.NewUserVerificationRepo(dbPool)
 	StoryRepo := postgres.NewStoryRepo(dbPool)
+	RefreshTokenRepo := postgres.NewRefreshTokenRepo(dbPool)
 
 	otpgenerator := security.Otpgen{OTPLength: a.Cfg.OTPLength}
 
-	jwttoken := security.JwtAuth{Secret: []byte(a.Cfg.JwtSecret), Issuer: a.Cfg.JwtISS}
+	jwttoken := security.JwtAuth{AccessSecret: []byte(a.Cfg.JwtAccessSecret), RefreshSecret: []byte(a.Cfg.JwtRefreshSecret), Issuer: a.Cfg.JwtISS}
 
-	userRegisterSvc := usecase.NewUserRegisterService(UserRepo, UserVerificationRepo, bcryptHasher, mailer, otpService, otpgenerator, jwttoken, logger)
+	userRegisterSvc := usecase.NewUserRegisterService(UserRepo, UserVerificationRepo, bcryptHasher, mailer, otpService, otpgenerator, jwttoken, RefreshTokenRepo, logger)
 
 	gemeniClient, err := ai.NewGemeniClient(rootctx, logger, a.Cfg.GeminiAPI, a.Cfg.GeminiModel)
 	if err != nil {
@@ -91,7 +92,7 @@ func (a App) Run() {
 	storyGenerationSvc := usecase.NewStoryGenerationService(UserRepo, StoryRepo, gemeniClient, workerPool, logger)
 
 	h := handler.NewUserHandler(userRegisterSvc, storyGenerationSvc, iplimiter, jwttoken, logger,
-		a.Cfg.OTPExpiration, a.Cfg.JwtISS, a.Cfg.JwtSecret, a.Cfg.RataLimitCapacity, a.Cfg.RataLimitFillRate,
+		a.Cfg.OTPExpiration, a.Cfg.JwtISS, a.Cfg.JwtAccessSecret, a.Cfg.JwtRefreshSecret, a.Cfg.RataLimitCapacity, a.Cfg.RataLimitFillRate,
 		a.Cfg.MaxAllowedSize)
 
 	routerCfg := router.RouterConfig{UserHandler: h}
