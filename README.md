@@ -14,7 +14,7 @@ Secure User Verification: User registration is validated with One-Time Passwords
 
 JWT Security Implementation: API endpoints are secured with JWTs. Both access and refresh tokens are implemented. Refresh tokens are persisted in the database, and a robust verification process is performed every time a user requests new tokens.
 
-Rate Limiting: The Leaky Bucket algorithm has been utilized for effective rate limiting enforced per IP address.
+Rate Limiting: The Token Bucket algorithm has been utilized for effective rate limiting enforced per IP address.
 
 Input Validation: User requests and inputs are strictly validated through dedicated middlewares. This includes checks for Content-Type, request body structure, passwords, and user preferences.
 
@@ -43,7 +43,7 @@ Database: PostgreSQL
 OTP Store: Redis  
 Migrations: Goose  
 Configuration: Viper  
-Rate Limiting: Leaky Bucket Algorithm  
+Rate Limiting: Token Bucket Algorithm  
 Authentication: JWT Middleware  
 Logging: Slog  
 Email Service: Mailtrap SMTP  
