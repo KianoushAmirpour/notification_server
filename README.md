@@ -7,18 +7,22 @@ Background Processing: Utilizes a **worker pool pattern** to efficiently offload
 
 Security & Access Control: Implements secure JWT authentication **(including access token and refresh token with rotation and revocation), One-Time Password (OTP) validation, and API rate limiting.**
 
-Detailed Functionality
-Asynchronous Task Handling: Time-consuming operations (story generation and email notification) are offloaded to channels and processed efficiently using the worker pool pattern.
+## Detailed Functionality:  
+**Asynchronous Task Handling**: Time-consuming operations (story generation and email notification) are offloaded to channels and processed efficiently using the worker pool pattern.  
 
-Secure User Verification: User registration is validated with One-Time Passwords (OTP). Redis is used to store OTP codes, and for enhanced security, the hashed version of the OTP is saved.
+**Secure User Verification**: User registration is validated with One-Time Passwords (OTP). Redis is used to store OTP codes, and for enhanced security, the hashed version of the OTP is saved.  
 
-JWT Security Implementation: API endpoints are secured with JWTs. Both access and refresh tokens are implemented. Refresh tokens are persisted in the database, and a robust verification process is performed every time a user requests new tokens.
+**JWT Security Implementation**: API endpoints are secured with JWTs. Both access and refresh tokens are implemented. Refresh tokens are persisted in the database, and a robust verification process is performed every time a user requests new tokens.  
 
+<<<<<<< HEAD
 Rate Limiting: The Token Bucket algorithm has been utilized for effective rate limiting enforced per IP address.
+=======
+**Rate Limiting**: The Leaky Bucket algorithm has been utilized for effective rate limiting enforced per IP address.  
+>>>>>>> 25a984be7b9095fd1e0f45c8432adf27b6ecf00b
 
-Input Validation: User requests and inputs are strictly validated through dedicated middlewares. This includes checks for Content-Type, request body structure, passwords, and user preferences.
+**Input Validation**: User requests and inputs are strictly validated through dedicated middlewares. This includes checks for Content-Type, request body structure, passwords, and user preferences.  
 
-Observability: Structured logging (using Go's slog) is implemented to effectively track and monitor request flow and processing throughout the service.
+**Observability**: Structured logging (using Go's slog) is implemented to effectively track and monitor request flow and processing throughout the service.  
   
 <!-- 
 A Go + Gin web service that generates personalized stories based on user preferences, using a **worker pool architecture, Redis for OTP, and PostgreSQL**.    
