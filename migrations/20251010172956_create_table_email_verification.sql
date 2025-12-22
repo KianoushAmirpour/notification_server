@@ -5,7 +5,11 @@ CREATE TABLE IF NOT EXISTS email_verification (
     request_id VARCHAR(256) NOT NULL,
     email VARCHAR(256) NOT NULL UNIQUE,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    updated_at TIMESTAMP NOT NULL DEFAULT NOW()
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_verification_staging_users
+        FOREIGN KEY (email)
+        REFERENCES staging_users(email)
+        ON DELETE CASCADE
 )
 -- +goose StatementEnd
 

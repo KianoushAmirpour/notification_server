@@ -1,0 +1,627 @@
+{
+    "swagger": "2.0",
+    "info": {
+        "description": "REST API for notifications",
+        "title": "Notification Service API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:4000",
+    "basePath": "/",
+    "paths": {
+        "/auth/login": {
+            "post": {
+                "description": "Authenticates a user and returns access and refresh tokens",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Login a user",
+                "parameters": [
+                    {
+                        "description": "User login payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.LoginUser"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "User logged in successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "413": {
+                        "description": "Payload too large",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "429": {
+                        "description": "Too many verification attempts",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    }
+                }
+            }
+        },
+        "/auth/verify": {
+            "post": {
+                "description": "Verifies a user using a one-time password (OTP)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Verify a user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Correlation ID for request tracing",
+                        "name": "X-Correlation-Id",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "User verification payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.RegisterVerify"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "User verified successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "404": {
+                        "description": "Verification data not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "413": {
+                        "description": "Payload too large",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "429": {
+                        "description": "Too many verification attempts",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Returns server status and runtime memory statistics",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "Check server health",
+                "responses": {
+                    "200": {
+                        "description": "Health check response",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HealthResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too many verification attempts",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    }
+                }
+            }
+        },
+        "/home": {
+            "get": {
+                "description": "Returns a welcome message",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System"
+                ],
+                "summary": "Home page",
+                "responses": {
+                    "200": {
+                        "description": "Welcome message",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Too many verification attempts",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    }
+                }
+            }
+        },
+        "/refresh": {
+            "post": {
+                "description": "Refreshes access and refresh tokens using a valid refresh token",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Refresh JWT token",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Refresh token",
+                        "name": "X-Refresh-Token",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "JWT tokens refreshed successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "404": {
+                        "description": "Token not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "429": {
+                        "description": "Too many verification attempts",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    }
+                }
+            }
+        },
+        "/stories": {
+            "post": {
+                "description": "Schedules story generation for a user",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Stories"
+                ],
+                "summary": "Generate a story",
+                "responses": {
+                    "201": {
+                        "description": "Story generation scheduled successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "413": {
+                        "description": "Payload too large",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "429": {
+                        "description": "Too many verification attempts",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "503": {
+                        "description": "External service error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    }
+                }
+            }
+        },
+        "/users": {
+            "delete": {
+                "description": "Deletes a user by ID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Delete a user",
+                "parameters": [
+                    {
+                        "description": "User deletion payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.DeleteUser"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "User deleted successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "404": {
+                        "description": "User not found",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "413": {
+                        "description": "Payload too large",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "429": {
+                        "description": "Too many verification attempts",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/register": {
+            "post": {
+                "description": "Registers a user with first name, last name, email, password, and preferences",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Users"
+                ],
+                "summary": "Register a new user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Correlation ID for request tracing",
+                        "name": "X-Correlation-Id",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "description": "User registration payload",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/dto.RegisteredUser"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "User registered successfully",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad request",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "409": {
+                        "description": "User already exists",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "413": {
+                        "description": "Payload too large",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "429": {
+                        "description": "Too many verification attempts",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal server error",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    },
+                    "503": {
+                        "description": "Service unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/dto.HttpError"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "dto.DeleteUser": {
+            "type": "object",
+            "required": [
+                "user_id"
+            ],
+            "properties": {
+                "user_id": {
+                    "type": "integer",
+                    "minimum": 0
+                }
+            }
+        },
+        "dto.HealthResponse": {
+            "type": "object",
+            "properties": {
+                "memory": {
+                    "type": "object",
+                    "properties": {
+                        "allocated_heap_objects_MB": {
+                            "type": "integer"
+                        },
+                        "cumulative_allocated_MB": {
+                            "type": "integer"
+                        },
+                        "gc_cycles": {
+                            "type": "integer"
+                        },
+                        "num_goroutines": {
+                            "type": "integer"
+                        },
+                        "total_memory_from_OS_MB": {
+                            "type": "integer"
+                        }
+                    }
+                },
+                "status": {
+                    "type": "object",
+                    "properties": {
+                        "status_code": {
+                            "type": "integer"
+                        }
+                    }
+                }
+            }
+        },
+        "dto.HttpError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "status_code": {
+                    "type": "integer"
+                }
+            }
+        },
+        "dto.LoginUser": {
+            "type": "object",
+            "required": [
+                "email",
+                "password"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.RegisterVerify": {
+            "type": "object",
+            "required": [
+                "otp"
+            ],
+            "properties": {
+                "otp": {
+                    "type": "string"
+                }
+            }
+        },
+        "dto.RegisteredUser": {
+            "type": "object",
+            "required": [
+                "email",
+                "first_name",
+                "last_name",
+                "password",
+                "preferences"
+            ],
+            "properties": {
+                "email": {
+                    "type": "string"
+                },
+                "first_name": {
+                    "type": "string"
+                },
+                "last_name": {
+                    "type": "string"
+                },
+                "password": {
+                    "type": "string",
+                    "maxLength": 64,
+                    "minLength": 8
+                },
+                "preferences": {
+                    "type": "array",
+                    "uniqueItems": true,
+                    "items": {
+                        "type": "string"
+                    }
+                }
+            }
+        }
+    }
+}

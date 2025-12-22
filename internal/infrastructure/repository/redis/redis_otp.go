@@ -7,35 +7,7 @@ import (
 	"time"
 
 	"github.com/KianoushAmirpour/notification_server/internal/domain"
-	"github.com/redis/go-redis/v9"
 )
-
-type RedisClient struct {
-	Client *redis.Client
-	Hasher domain.HashRepository
-}
-
-func NewRedisClient(Client *redis.Client, hasher domain.HashRepository) *RedisClient {
-	return &RedisClient{Client: Client, Hasher: hasher}
-}
-
-func ConnectToRedis(addr string, database int) (*redis.Client, error) {
-	rdb := redis.NewClient(&redis.Options{
-		Addr: addr,
-		DB:   database,
-	})
-
-	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Minute*5)
-	defer cancelFunc()
-
-	_, err := rdb.Ping(ctx).Result()
-	if err != nil {
-		return nil, domain.ErrDbConnection
-	}
-
-	return rdb, nil
-
-}
 
 func (r RedisClient) SaveOTP(ctx context.Context, email string, otp string, expiration int) error {
 
@@ -43,7 +15,7 @@ func (r RedisClient) SaveOTP(ctx context.Context, email string, otp string, expi
 		useremail string
 		otp       string
 	}{useremail: email, otp: otp}
-	key := fmt.Sprintf("users:%s", userdata.useremail)
+	key := fmt.Sprintf("users:otp:%s", userdata.useremail)
 	// setResult := rdb.Set(ctx, key, userdata.otp, time.Minute*2)
 
 	setResult := r.Client.HSet(ctx, key, "otp", userdata.otp, "retry_count", 0)
@@ -63,7 +35,7 @@ func (r RedisClient) SaveOTP(ctx context.Context, email string, otp string, expi
 
 func (r RedisClient) VerifyOTP(ctx context.Context, email string, sentopt string) error {
 
-	key := fmt.Sprintf("users:%s", email)
+	key := fmt.Sprintf("users:otp:%s", email)
 	// userdata, err := rdb.Get(ctx, key).Result()
 	rdbData := r.Client.HGetAll(ctx, key)
 	err := rdbData.Err()

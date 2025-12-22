@@ -3,6 +3,7 @@ package postgres
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/KianoushAmirpour/notification_server/internal/domain"
@@ -92,9 +93,25 @@ func (u *UserRepo) DeleteUserByID(ctx context.Context, id int) error {
 func (u *UserRepo) GetUserByID(ctx context.Context, id int) (*domain.User, error) {
 	var user domain.User
 
-	query := `select id, first_name, last_name, email, preferences from users where id=$1`
+	query := `select id, first_name, last_name, email from users where id=$1`
 	row := u.Db.QueryRow(ctx, query, id)
-	err := row.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.Preferences)
+	err := row.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, domain.ErrUserNotFound
+	}
+	if err != nil {
+		return nil, domain.NewDomainError(domain.ErrCodeInternal, "query failed", err)
+	}
+	return &user, nil
+
+}
+
+func (u *UserRepo) GetUserPreferencesByID(ctx context.Context, id int) (*domain.Preferences, error) {
+	var user domain.Preferences
+
+	query := `select id, user_id, preferences from users_preferences where user_id=$1`
+	row := u.Db.QueryRow(ctx, query, id)
+	err := row.Scan(&user.ID, &user.UserID, &user.UserPreferences)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, domain.ErrUserNotFound
 	}
@@ -108,9 +125,9 @@ func (u *UserRepo) GetUserByID(ctx context.Context, id int) (*domain.User, error
 func (u *UserRepo) GetUserByEmail(ctx context.Context, email string) (*domain.User, error) {
 	var user domain.User
 
-	query := `select id, first_name, last_name, email, password, preferences from users where email=$1`
+	query := `select id, first_name, last_name, email, password from users where email=$1`
 	row := u.Db.QueryRow(ctx, query, email)
-	err := row.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.Password, &user.Preferences)
+	err := row.Scan(&user.ID, &user.FirstName, &user.LastName, &user.Email, &user.Password)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return nil, domain.ErrEmailNotFound
 	}
@@ -141,11 +158,40 @@ func (v *UserVerificationRepo) CreateUser(ctx context.Context, u *domain.User) e
 	return nil
 }
 
-func (v *UserVerificationRepo) MoveUserFromStaging(ctx context.Context, email string) error {
-	query := `Insert into users select * from staging_users where email=$1 returning id`
+func (v *UserVerificationRepo) PersistUserInfo(ctx context.Context, email string) (int, []string, error) {
+	query := `
+	WITH selected AS (
+    SELECT first_name, last_name, email, password, preferences
+    FROM staging_users
+    WHERE email = $1
+)
+	INSERT INTO users (first_name, last_name, email, password)
+	SELECT first_name, last_name, email, password
+	FROM selected
+	RETURNING id,
+		(SELECT preferences FROM selected);
+`
 
 	var returnedID int
+	var preferences []string
 	row := v.Db.QueryRow(ctx, query, email)
+	err := row.Scan(&returnedID, &preferences)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, []string{}, domain.ErrPersistUser
+	}
+	if err != nil {
+		return 0, []string{}, domain.NewDomainError(domain.ErrCodeInternal, "query failed", err)
+	}
+
+	return returnedID, preferences, nil
+
+}
+
+func (v *UserVerificationRepo) PersistUserPreferenes(ctx context.Context, user_id int, preferences []string) error {
+	query := `Insert into users_preferences (user_id, preferences) values ($1, $2) returning id`
+
+	var returnedID int
+	row := v.Db.QueryRow(ctx, query, user_id, preferences)
 	err := row.Scan(&returnedID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.ErrPersistUser
@@ -155,7 +201,6 @@ func (v *UserVerificationRepo) MoveUserFromStaging(ctx context.Context, email st
 	}
 
 	return nil
-
 }
 
 func (v *UserVerificationRepo) DeleteUserFromStaging(ctx context.Context, email string) error {
@@ -228,35 +273,36 @@ func (v *UserVerificationRepo) DeleteUserVerificationData(ctx context.Context, e
 
 }
 
-func (s *StoryRepo) Save(ctx context.Context, i *domain.Story) error {
+func (s *StoryRepo) SaveStoryInfo(ctx context.Context, i *domain.Story) (int, error) {
 	query := `
 	insert into stories
-	(file_name, user_id, story, status)
-	values ($1, $2, $3, $4)
+	(file_name, user_id, story)
+	values ($1, $2, $3)
 	returning id
 	`
 	var returnedID int
 
-	row := s.Db.QueryRow(ctx, query, i.FileName, i.UserID, i.Story, i.Status)
+	row := s.Db.QueryRow(ctx, query, i.FileName, i.UserID, i.Story)
 	err := row.Scan(&returnedID)
 	if errors.Is(err, pgx.ErrNoRows) {
-		return domain.ErrPersistStory
+		return 0, domain.ErrPersistStory
 	}
 	if err != nil {
-		return domain.NewDomainError(domain.ErrCodeInternal, "query failed", err)
+		return 0, domain.NewDomainError(domain.ErrCodeInternal, "query failed", err)
 	}
-	return nil
+	return returnedID, nil
 
 }
 
-func (s *StoryRepo) Upload(ctx context.Context, story *domain.UploadStory) error {
+func (s *StoryRepo) UploadStory(ctx context.Context, story *domain.UploadStory) error {
 
-	query := `UPDATE stories
-			SET 
-				story = $1,
-				updated_at = NOW(),
-				status='completed'
-			WHERE user_id = $2 RETURNING id;
+	query := `
+	UPDATE stories
+	SET
+    	story = $1,
+    	updated_at = NOW()
+	WHERE user_id = $2
+	RETURNING id;
 	`
 	var returnedID int
 	row := s.Db.QueryRow(ctx, query, story.Story, story.UserID)
@@ -268,6 +314,88 @@ func (s *StoryRepo) Upload(ctx context.Context, story *domain.UploadStory) error
 		return domain.NewDomainError(domain.ErrCodeInternal, "query failed", err)
 	}
 	return nil
+}
+
+func (s *StoryRepo) SaveStoryJob(ctx context.Context, storyID int, status string) (int, error) {
+	query := `
+	insert into story_jobs
+	(story_id, status)
+	values ($1, $2)
+	returning id`
+
+	var returnedID int
+	row := s.Db.QueryRow(ctx, query, storyID, status)
+	err := row.Scan(&returnedID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, domain.ErrStoryNotFound
+	}
+	if err != nil {
+		return 0, domain.NewDomainError(domain.ErrCodeInternal, "query failed", err)
+	}
+	return returnedID, nil
+
+}
+
+func (s *StoryRepo) UpdateStoryJob(ctx context.Context, storyID int, status string) error {
+	query := `
+	UPDATE story_jobs
+			SET 
+				status=$1
+			WHERE story_id = $2 RETURNING id;
+	`
+
+	var returnedID int
+	row := s.Db.QueryRow(ctx, query, status, storyID)
+	err := row.Scan(&returnedID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.ErrStoryNotFound
+	}
+	if err != nil {
+		return domain.NewDomainError(domain.ErrCodeInternal, "query failed", err)
+	}
+	return nil
+
+}
+
+func (s *StoryRepo) UpdateEmailJob(ctx context.Context, storyID int, userID int, status string) error {
+	query := `
+	UPDATE email_jobs
+			SET 
+				status=$1
+			WHERE story_id = $2 AND user_id = $3 RETURNING id;
+	`
+
+	var returnedID int
+	row := s.Db.QueryRow(ctx, query, status, storyID, userID)
+	err := row.Scan(&returnedID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return domain.ErrStoryNotFound
+	}
+	if err != nil {
+		return domain.NewDomainError(domain.ErrCodeInternal, "query failed", err)
+	}
+	return nil
+
+}
+
+func (s *StoryRepo) SaveEmailJob(ctx context.Context, storyID, userID int, status string) (int, error) {
+	query := `
+	insert into email_jobs
+	(story_id, user_id, status)
+	values ($1, $2, $3)
+	returning id`
+
+	var returnedID int
+	row := s.Db.QueryRow(ctx, query, storyID, userID, status)
+	err := row.Scan(&returnedID)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return 0, domain.ErrStoryNotFound
+	}
+	if err != nil {
+		return 0, domain.NewDomainError(domain.ErrCodeInternal, "query failed", err)
+	}
+	return returnedID, nil
+
 }
 
 func (r *RefreshTokenRepo) StoreRefreshToken(ctx context.Context, userID int, tokenHash string, expiresAt time.Time) error {
@@ -321,17 +449,22 @@ func (r *RefreshTokenRepo) RetrieveRefreshToken(ctx context.Context, userID int)
 func (r *RefreshTokenRepo) UpdateRefreshToken(ctx context.Context, userID int, revokedAt time.Time) error {
 	query := `
 	UPDATE refresh_tokens
-	SET 
-		revoked_at = $2
-	WHERE user_id = $1
-	AND revoked_at IS NULL
-	ORDER BY created_at DESC
-	LIMIT 1;
+	SET revoked_at = $2
+	WHERE id = (
+    SELECT id
+    FROM refresh_tokens
+    WHERE user_id = $1
+      AND revoked_at IS NULL
+    ORDER BY created_at DESC
+    LIMIT 1
+)
+	RETURNING id;
 	`
 	var returnedID uuid.UUID
 
 	row := r.Db.QueryRow(ctx, query, userID, revokedAt)
 	err := row.Scan(&returnedID)
+	fmt.Println(returnedID)
 	if errors.Is(err, pgx.ErrNoRows) {
 		return domain.ErrPersistRefreshToken
 	}

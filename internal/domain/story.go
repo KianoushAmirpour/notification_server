@@ -1,12 +1,13 @@
 package domain
 
-import "context"
+import (
+	"context"
+)
 
 type Story struct {
 	FileName string
 	UserID   int
 	Story    string
-	Status   string
 }
 
 type UploadStory struct {
@@ -15,8 +16,12 @@ type UploadStory struct {
 }
 
 type StoryRepository interface {
-	Save(ctx context.Context, s *Story) error
-	Upload(ctx context.Context, s *UploadStory) error
+	SaveStoryInfo(ctx context.Context, s *Story) (int, error)
+	UploadStory(ctx context.Context, s *UploadStory) error
+	SaveStoryJob(ctx context.Context, storyID int, status string) (int, error)
+	SaveEmailJob(ctx context.Context, storyID, userID int, status string) (int, error)
+	UpdateStoryJob(ctx context.Context, storyID int, status string) error
+	UpdateEmailJob(ctx context.Context, storyID int, userID int, status string) error
 }
 
 type GenerateStoryRepository interface {

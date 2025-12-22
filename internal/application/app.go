@@ -15,7 +15,6 @@ import (
 	router "github.com/KianoushAmirpour/notification_server/internal/adapters/http"
 	"github.com/KianoushAmirpour/notification_server/internal/adapters/http/handler"
 	"github.com/KianoushAmirpour/notification_server/internal/adapters/http/middleware"
-	"github.com/KianoushAmirpour/notification_server/internal/domain"
 	"github.com/KianoushAmirpour/notification_server/internal/infrastructure/ai"
 	config "github.com/KianoushAmirpour/notification_server/internal/infrastructure/configs"
 	"github.com/KianoushAmirpour/notification_server/internal/infrastructure/notification"
@@ -52,9 +51,12 @@ func (a App) Run() {
 	}
 	defer redisConn.Close()
 
-	bcryptHasher := security.Hasher{Cost: a.Cfg.BcryptCost}
+	bcryptPasswordHasher := security.Hasher{Cost: a.Cfg.BcryptCost}
 
-	otpService := redis.NewRedisClient(redisConn, bcryptHasher)
+	otpService := redis.NewRedisClient(redisConn, bcryptPasswordHasher)
+
+	storyGenerationTask := &redis.Task{Client: redisConn, GroupName: a.Cfg.StoryConsumerGroup}
+	emailNotificationTask := &redis.Task{Client: redisConn, GroupName: a.Cfg.EmailConsumerGroup}
 
 	mailer := notification.Mailer{
 		Host:      a.Cfg.SmtpHost,
@@ -75,23 +77,55 @@ func (a App) Run() {
 
 	jwttoken := security.JwtAuth{AccessSecret: []byte(a.Cfg.JwtAccessSecret), RefreshSecret: []byte(a.Cfg.JwtRefreshSecret), Issuer: a.Cfg.JwtISS}
 
-	userRegisterSvc := usecase.NewUserRegisterService(UserRepo, UserVerificationRepo, bcryptHasher, mailer, otpService, otpgenerator, jwttoken, RefreshTokenRepo, logger)
+	userRegisterSvc := usecase.NewUserRegisterService(UserRepo, UserVerificationRepo, bcryptPasswordHasher, mailer, otpService, otpgenerator, jwttoken, RefreshTokenRepo, logger)
 
-	gemeniClient, err := ai.NewGemeniClient(rootctx, logger, a.Cfg.GeminiAPI, a.Cfg.GeminiModel)
+	gemeniClient, err := ai.NewGemeniClient(rootctx, a.Cfg.GeminiAPI, a.Cfg.GeminiModel)
 	if err != nil {
 		logger.Error("failed to create gemeni client", "reason", err.Error())
 		panic(err)
 	}
 
-	resultchan := make(chan domain.EmailNotificationJob, 100)
-	emailWorkerPool := queue.NewEmailWorkerPool(rootctx, a.Cfg.WorkerCounts, a.Cfg.JobQueueSize, logger)
-	emailWorkerPool.Start(resultchan)
-	workerPool := queue.NewWorkerPool(rootctx, a.Cfg.WorkerCounts, a.Cfg.JobQueueSize, logger, mailer)
-	workerPool.Start(resultchan)
+	storyJobExecuter := usecase.NewStoryGenerationService(
+		UserRepo,
+		StoryRepo,
+		gemeniClient,
+		logger)
+	storyJobCompletionHandler := usecase.NewStoryGenerationJobCompletion(
+		StoryRepo,
+		storyGenerationTask,
+		a.Cfg.StoryGenerationStream,
+		a.Cfg.EmailNotificationStream,
+		a.Cfg.StoryDLQStream,
+		logger)
 
-	storyGenerationSvc := usecase.NewStoryGenerationService(UserRepo, StoryRepo, gemeniClient, workerPool, logger)
+	emailJobExecuter := usecase.NewEmailSenderService(mailer, logger)
+	emailJobCompletionHandler := usecase.NewEmailNotificationJobCompletion(
+		StoryRepo,
+		emailNotificationTask,
+		a.Cfg.EmailNotificationStream,
+		a.Cfg.EmailDLQStream,
+		logger)
 
-	h := handler.NewUserHandler(userRegisterSvc, storyGenerationSvc, iplimiter, jwttoken, logger,
+	// resultchan := make(chan domain.EmailNotificationJob, 100)
+	storyWorkerPool := queue.NewWorkerPool(rootctx, a.Cfg.WorkerCounts, logger, storyGenerationTask,
+		storyJobExecuter, storyJobCompletionHandler, a.Cfg.StoryGenerationStream, a.Cfg.StoryConsumerGroup, a.Cfg.JobRetryCount)
+	emailWorkerPool := queue.NewWorkerPool(rootctx, a.Cfg.WorkerCounts, logger, emailNotificationTask, emailJobExecuter, emailJobCompletionHandler,
+		a.Cfg.EmailNotificationStream, a.Cfg.EmailConsumerGroup, a.Cfg.JobRetryCount)
+	storyWorkerPool.Start()
+	emailWorkerPool.Start()
+	// emailWorkerPool := queue.NewEmailWorkerPool(rootctx, a.Cfg.WorkerCounts, a.Cfg.JobQueueSize, logger)
+	// emailWorkerPool.Start(resultchan)
+	// workerPool := queue.NewWorkerPool(rootctx, a.Cfg.WorkerCounts, a.Cfg.JobQueueSize, logger, mailer)
+	// workerPool.Start(resultchan)
+
+	schedulerStoryConsumer := queue.NewShedulerWorkerPool(rootctx, a.Cfg.SchedulerWorkerCounts, logger, a.Cfg.StoryRetryStream, storyGenerationTask, a.Cfg.StoryGenerationStream)
+	schedulerStoryConsumer.Start()
+	schedulerEmailConsumer := queue.NewShedulerWorkerPool(rootctx, a.Cfg.SchedulerWorkerCounts, logger, a.Cfg.EmailRetryStream, emailNotificationTask, a.Cfg.EmailNotificationStream)
+	schedulerEmailConsumer.Start()
+
+	storyScheduleService := usecase.NewStorySchedulerService(UserRepo, StoryRepo, storyGenerationTask, logger, a.Cfg.StoryGenerationStream)
+
+	h := handler.NewUserHandler(userRegisterSvc, storyScheduleService, iplimiter, jwttoken, logger,
 		a.Cfg.OTPExpiration, a.Cfg.JwtISS, a.Cfg.JwtAccessSecret, a.Cfg.JwtRefreshSecret, a.Cfg.RataLimitCapacity, a.Cfg.RataLimitFillRate,
 		a.Cfg.MaxAllowedSize)
 
@@ -122,14 +156,11 @@ func (a App) Run() {
 		logger.Error("server closed with error", "reason", err.Error())
 	}
 
-	workerPool.Cancel()
+	storyWorkerPool.Cancel()
 	emailWorkerPool.Cancel()
 
-	workerPool.Wait()
+	storyWorkerPool.Wait()
 	emailWorkerPool.Wait()
-
-	workerPool.Close()
-	emailWorkerPool.Close()
 
 	logger.Info("check number of goroutine", "number", runtime.NumGoroutine())
 

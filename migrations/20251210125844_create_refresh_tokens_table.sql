@@ -7,7 +7,10 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     expires_at TIMESTAMP NOT NULL,
     revoked_at TIMESTAMP NULL,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    CONSTRAINT fk_tokens_users
+        FOREIGN KEY (user_id)
+        REFERENCES users(id)
+        ON DELETE CASCADE
 );
 
 -- +goose StatementEnd

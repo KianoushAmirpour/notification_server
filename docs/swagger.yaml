@@ -1,0 +1,416 @@
+basePath: /
+definitions:
+  dto.DeleteUser:
+    properties:
+      user_id:
+        minimum: 0
+        type: integer
+    required:
+    - user_id
+    type: object
+  dto.HealthResponse:
+    properties:
+      memory:
+        properties:
+          allocated_heap_objects_MB:
+            type: integer
+          cumulative_allocated_MB:
+            type: integer
+          gc_cycles:
+            type: integer
+          num_goroutines:
+            type: integer
+          total_memory_from_OS_MB:
+            type: integer
+        type: object
+      status:
+        properties:
+          status_code:
+            type: integer
+        type: object
+    type: object
+  dto.HttpError:
+    properties:
+      code:
+        type: string
+      message:
+        type: string
+      status_code:
+        type: integer
+    type: object
+  dto.LoginUser:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  dto.RegisterVerify:
+    properties:
+      otp:
+        type: string
+    required:
+    - otp
+    type: object
+  dto.RegisteredUser:
+    properties:
+      email:
+        type: string
+      first_name:
+        type: string
+      last_name:
+        type: string
+      password:
+        maxLength: 64
+        minLength: 8
+        type: string
+      preferences:
+        items:
+          type: string
+        type: array
+        uniqueItems: true
+    required:
+    - email
+    - first_name
+    - last_name
+    - password
+    - preferences
+    type: object
+host: localhost:4000
+info:
+  contact: {}
+  description: REST API for notifications
+  title: Notification Service API
+  version: "1.0"
+paths:
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      description: Authenticates a user and returns access and refresh tokens
+      parameters:
+      - description: User login payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.LoginUser'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User logged in successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "413":
+          description: Payload too large
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "429":
+          description: Too many verification attempts
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+      summary: Login a user
+      tags:
+      - Authentication
+  /auth/verify:
+    post:
+      consumes:
+      - application/json
+      description: Verifies a user using a one-time password (OTP)
+      parameters:
+      - description: Correlation ID for request tracing
+        in: header
+        name: X-Correlation-Id
+        required: true
+        type: string
+      - description: User verification payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RegisterVerify'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User verified successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "404":
+          description: Verification data not found
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "413":
+          description: Payload too large
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "429":
+          description: Too many verification attempts
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+      summary: Verify a user
+      tags:
+      - Authentication
+  /health:
+    get:
+      description: Returns server status and runtime memory statistics
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Health check response
+          schema:
+            $ref: '#/definitions/dto.HealthResponse'
+        "429":
+          description: Too many verification attempts
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+      summary: Check server health
+      tags:
+      - System
+  /home:
+    get:
+      description: Returns a welcome message
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Welcome message
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "429":
+          description: Too many verification attempts
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+      summary: Home page
+      tags:
+      - System
+  /refresh:
+    post:
+      consumes:
+      - application/json
+      description: Refreshes access and refresh tokens using a valid refresh token
+      parameters:
+      - description: Refresh token
+        in: header
+        name: X-Refresh-Token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: JWT tokens refreshed successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "404":
+          description: Token not found
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "429":
+          description: Too many verification attempts
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+      summary: Refresh JWT token
+      tags:
+      - Authentication
+  /stories:
+    post:
+      consumes:
+      - application/json
+      description: Schedules story generation for a user
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Story generation scheduled successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "413":
+          description: Payload too large
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "429":
+          description: Too many verification attempts
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "503":
+          description: External service error
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+      summary: Generate a story
+      tags:
+      - Stories
+  /users:
+    delete:
+      consumes:
+      - application/json
+      description: Deletes a user by ID
+      parameters:
+      - description: User deletion payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.DeleteUser'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: User deleted successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "404":
+          description: User not found
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "413":
+          description: Payload too large
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "429":
+          description: Too many verification attempts
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+      summary: Delete a user
+      tags:
+      - Users
+  /users/register:
+    post:
+      consumes:
+      - application/json
+      description: Registers a user with first name, last name, email, password, and
+        preferences
+      parameters:
+      - description: Correlation ID for request tracing
+        in: header
+        name: X-Correlation-Id
+        required: true
+        type: string
+      - description: User registration payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/dto.RegisteredUser'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: User registered successfully
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad request
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "409":
+          description: User already exists
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "413":
+          description: Payload too large
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "429":
+          description: Too many verification attempts
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "500":
+          description: Internal server error
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+        "503":
+          description: Service unavailable
+          schema:
+            $ref: '#/definitions/dto.HttpError'
+      summary: Register a new user
+      tags:
+      - Users
+swagger: "2.0"

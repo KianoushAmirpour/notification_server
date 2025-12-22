@@ -6,11 +6,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"runtime/debug"
 	"strings"
+	"time"
 
+	"github.com/KianoushAmirpour/notification_server/internal/adapters/http/dto"
 	"github.com/KianoushAmirpour/notification_server/internal/adapters/http/utils"
 	"github.com/KianoushAmirpour/notification_server/internal/domain"
+	"github.com/KianoushAmirpour/notification_server/internal/observability"
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"
@@ -22,14 +24,14 @@ func AuthenticateMiddleware(auth domain.JwtTokenRepository, secretKey []byte) gi
 		authHeader := c.GetHeader("Authorization")
 		parts := strings.SplitN(authHeader, " ", 2)
 		if len(parts) != 2 || strings.ToLower(parts[0]) != "bearer" {
-			httpErr := utils.HttpError{Message: "Invalid Authorization format", Code: domain.ErrCodeUnauthorized, StatusCode: http.StatusUnauthorized}
+			httpErr := dto.HttpError{Message: "Invalid Authorization format", Code: domain.ErrCodeUnauthorized, StatusCode: http.StatusUnauthorized}
 			c.AbortWithStatusJSON(httpErr.StatusCode, httpErr)
 			return
 		}
 		tokenString := parts[1]
 		token, err := auth.VerifyJWTToken(tokenString, secretKey)
 		if err != nil {
-			httpErr := utils.HttpError{Message: "Invalid or expired token", Code: domain.ErrCodeUnauthorized, StatusCode: http.StatusUnauthorized}
+			httpErr := dto.HttpError{Message: "Invalid or expired token", Code: domain.ErrCodeUnauthorized, StatusCode: http.StatusUnauthorized}
 			c.AbortWithStatusJSON(httpErr.StatusCode, httpErr)
 			return
 		}
@@ -39,7 +41,7 @@ func AuthenticateMiddleware(auth domain.JwtTokenRepository, secretKey []byte) gi
 	}
 }
 
-func AddRequestID() gin.HandlerFunc {
+func AddRequestIDAndTime() gin.HandlerFunc {
 
 	return func(c *gin.Context) {
 		requestID := c.GetHeader("X-Request-Id")
@@ -47,6 +49,10 @@ func AddRequestID() gin.HandlerFunc {
 			requestID = uuid.New().String()
 
 		}
+
+		ctx := observability.WithRequestID(c.Request.Context(), requestID)
+		ctx = observability.WithrequestStartTimeKey(ctx)
+		c.Request = c.Request.WithContext(ctx)
 		c.Writer.Header().Set("X-Request-Id", requestID)
 		c.Set("RequestID", requestID)
 		c.Next()
@@ -74,7 +80,7 @@ func CheckContentType() gin.HandlerFunc {
 
 		parts := strings.Split(contentType, ";")
 		if len(parts) == 0 || strings.TrimSpace(strings.ToLower(parts[0])) != "application/json" {
-			httpErr := utils.HttpError{Message: "invalid content type, expected application/json", Code: domain.ErrCodeValidation, StatusCode: http.StatusBadRequest}
+			httpErr := dto.HttpError{Message: "invalid content type, expected application/json", Code: domain.ErrCodeValidation, StatusCode: http.StatusBadRequest}
 			c.AbortWithStatusJSON(httpErr.StatusCode, httpErr)
 			return
 		}
@@ -99,43 +105,43 @@ func CheckContentBody[T any](maxsize int) gin.HandlerFunc {
 			switch {
 
 			case errors.Is(err, io.EOF):
-				httpErr := utils.HttpError{Message: "body must not be empty", Code: domain.ErrCodeValidation, StatusCode: http.StatusBadRequest}
+				httpErr := dto.HttpError{Message: "body must not be empty", Code: domain.ErrCodeValidation, StatusCode: http.StatusBadRequest}
 				c.AbortWithStatusJSON(httpErr.StatusCode, httpErr)
 				return
 
 			case errors.Is(err, io.ErrUnexpectedEOF):
-				httpErr := utils.HttpError{Message: "body contains badly-formed json", Code: domain.ErrCodeValidation, StatusCode: http.StatusBadRequest}
+				httpErr := dto.HttpError{Message: "body contains badly-formed json", Code: domain.ErrCodeValidation, StatusCode: http.StatusBadRequest}
 				c.AbortWithStatusJSON(httpErr.StatusCode, httpErr)
 				return
 
 			case err.Error() == "http: request body too large":
-				httpErr := utils.HttpError{Message: fmt.Sprintf("body must not be larger than %d bytes", maxsize), Code: domain.ErrCodeValidation, StatusCode: http.StatusRequestEntityTooLarge}
+				httpErr := dto.HttpError{Message: fmt.Sprintf("body must not be larger than %d bytes", maxsize), Code: domain.ErrCodeValidation, StatusCode: http.StatusRequestEntityTooLarge}
 				c.AbortWithStatusJSON(httpErr.StatusCode, httpErr)
 				return
 
 			case errors.As(err, &syntanxErr):
-				httpErr := utils.HttpError{Message: fmt.Sprintf("body contains badly-formed json at character %d", syntanxErr.Offset), Code: domain.ErrCodeValidation, StatusCode: http.StatusBadRequest}
+				httpErr := dto.HttpError{Message: fmt.Sprintf("body contains badly-formed json at character %d", syntanxErr.Offset), Code: domain.ErrCodeValidation, StatusCode: http.StatusBadRequest}
 				c.AbortWithStatusJSON(httpErr.StatusCode, httpErr)
 				return
 
 			case errors.As(err, &unmarshalTypeErr):
-				httpErr := utils.HttpError{Message: fmt.Sprintf("body contains incorrect json type for %q at %d", unmarshalTypeErr.Field, unmarshalTypeErr.Offset), Code: domain.ErrCodeValidation, StatusCode: http.StatusBadRequest}
+				httpErr := dto.HttpError{Message: fmt.Sprintf("body contains incorrect json type for %q at %d", unmarshalTypeErr.Field, unmarshalTypeErr.Offset), Code: domain.ErrCodeValidation, StatusCode: http.StatusBadRequest}
 				c.AbortWithStatusJSON(httpErr.StatusCode, httpErr)
 				return
 
 			case strings.HasPrefix(err.Error(), "json: unknown field"):
 				fieldname := strings.TrimPrefix(err.Error(), "json: unknown field")
-				httpErr := utils.HttpError{Message: fmt.Sprintf("body contains unknow key %s", fieldname), Code: domain.ErrCodeValidation, StatusCode: http.StatusBadRequest}
+				httpErr := dto.HttpError{Message: fmt.Sprintf("body contains unknow key %s", fieldname), Code: domain.ErrCodeValidation, StatusCode: http.StatusBadRequest}
 				c.AbortWithStatusJSON(httpErr.StatusCode, httpErr)
 				return
 
 			case errors.As(err, &invalidmarshaltype):
-				httpErr := utils.HttpError{Message: fmt.Sprintf("error unmarshaling json: %s", invalidmarshaltype.Error()), Code: domain.ErrCodeValidation, StatusCode: http.StatusInternalServerError}
+				httpErr := dto.HttpError{Message: fmt.Sprintf("error unmarshaling json: %s", invalidmarshaltype.Error()), Code: domain.ErrCodeValidation, StatusCode: http.StatusInternalServerError}
 				c.AbortWithStatusJSON(httpErr.StatusCode, httpErr)
 				return
 
 			default:
-				httpErr := utils.HttpError{Message: fmt.Sprintf("error happend: %s", err.Error()), Code: domain.ErrCodeValidation, StatusCode: http.StatusBadRequest}
+				httpErr := dto.HttpError{Message: fmt.Sprintf("error happend: %s", err.Error()), Code: domain.ErrCodeValidation, StatusCode: http.StatusBadRequest}
 				c.AbortWithStatusJSON(httpErr.StatusCode, httpErr)
 				return
 
@@ -146,7 +152,7 @@ func CheckContentBody[T any](maxsize int) gin.HandlerFunc {
 		dec.DisallowUnknownFields()
 		err = dec.Decode(&struct{}{})
 		if err != io.EOF {
-			httpErr := utils.HttpError{Message: "body must contain only one json value", Code: domain.ErrCodeValidation, StatusCode: http.StatusBadRequest}
+			httpErr := dto.HttpError{Message: "body must contain only one json value", Code: domain.ErrCodeValidation, StatusCode: http.StatusBadRequest}
 			c.AbortWithStatusJSON(httpErr.StatusCode, httpErr)
 			return
 		}
@@ -154,19 +160,19 @@ func CheckContentBody[T any](maxsize int) gin.HandlerFunc {
 		validate := validator.New()
 		err = validate.RegisterValidation("passwod_strength", utils.PasswordValidator)
 		if err != nil {
-			httpErr := utils.HttpError{Message: "failed to register validation", Code: domain.ErrCodeInternal, StatusCode: http.StatusInternalServerError}
+			httpErr := dto.HttpError{Message: "failed to register validation", Code: domain.ErrCodeInternal, StatusCode: http.StatusInternalServerError}
 			c.AbortWithStatusJSON(httpErr.StatusCode, httpErr)
 			return
 		}
 		err = validate.RegisterValidation("user_preferences_check", utils.UserPreferencesValidation)
 		if err != nil {
-			httpErr := utils.HttpError{Message: "failed to register validation", Code: domain.ErrCodeInternal, StatusCode: http.StatusInternalServerError}
+			httpErr := dto.HttpError{Message: "failed to register validation", Code: domain.ErrCodeInternal, StatusCode: http.StatusInternalServerError}
 			c.AbortWithStatusJSON(httpErr.StatusCode, httpErr)
 			return
 		}
 		err = validate.Struct(u)
 		if err != nil {
-			httpErr := utils.HttpError{Message: err.Error(), Code: domain.ErrCodeInternal, StatusCode: http.StatusBadRequest}
+			httpErr := dto.HttpError{Message: err.Error(), Code: domain.ErrCodeInternal, StatusCode: http.StatusBadRequest}
 			c.AbortWithStatusJSON(httpErr.StatusCode, httpErr)
 			return
 		}
@@ -179,18 +185,41 @@ func CheckContentBody[T any](maxsize int) gin.HandlerFunc {
 func RateLimiterMiddelware(ipratelimiter *IPRateLimiter, capacity, fillrate float64, logger domain.LoggingRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
-		log := logger.With("service", "rate_limiter", "request_id", c.GetString("RequestID"))
+		log := logger.With(
+			"service.name", "rate_limiter_middleware",
+			"@timestamp", time.Now().UTC().Format(time.RFC3339Nano),
+			"event.category", []string{"authentication", "web"},
+			"http.request.method", c.Request.Method,
+			"http.request.path", c.FullPath(),
+			"http.request.agent", c.Request.UserAgent(),
+			"http.request.id", observability.GetRequestID(c.Request.Context()),
+			"client.ip", c.ClientIP(),
+		)
 		if ip == "" {
-			log.Warn("extract_user_ip", "reason", "invalid_user_ip")
-			httpErr := utils.HttpError{Message: "invalid ip", Code: domain.ErrCodeValidation, StatusCode: http.StatusBadRequest}
+			log.Error(
+				"invalid ip address",
+				"error.message", "invalid ip address",
+				"error.code", http.StatusBadRequest,
+				"event.action", "middleware.rate_limiter",
+				"event.outcome", "failed",
+				"event.type", []string{"end", "denied"},
+			)
+			httpErr := dto.HttpError{Message: "invalid ip", Code: domain.ErrCodeValidation, StatusCode: http.StatusBadRequest}
 			c.AbortWithStatusJSON(httpErr.StatusCode, httpErr)
 			return
 		}
 		rateLimiter := ipratelimiter.RequestRateLimiter(ip, capacity, fillrate)
 
 		if !rateLimiter.AllowRequest() {
-			log.Warn("rate_limit_check", "reason", "rate_limit_exceeded", "user_ip", ip)
-			httpErr := utils.HttpError{Message: "Rate Limit Exceeded", Code: domain.ErrCodeRateLimited, StatusCode: http.StatusTooManyRequests}
+			log.Error(
+				"rate limit exceeded",
+				"error.message", "rate limit exceeded",
+				"error.code", http.StatusTooManyRequests,
+				"event.action", "middleware.rate_limiter",
+				"event.outcome", "failed",
+				"event.type", []string{"end", "denied"},
+			)
+			httpErr := dto.HttpError{Message: "Rate Limit Exceeded", Code: domain.ErrCodeRateLimited, StatusCode: http.StatusTooManyRequests}
 			c.AbortWithStatusJSON(httpErr.StatusCode, httpErr)
 			return
 		}
@@ -198,33 +227,55 @@ func RateLimiterMiddelware(ipratelimiter *IPRateLimiter, capacity, fillrate floa
 	}
 }
 
-func LoggingRequestMiddleware(logger domain.LoggingRepository) gin.HandlerFunc {
-	return func(c *gin.Context) {
+// func LoggingRequestMiddleware(logger domain.LoggingRepository) gin.HandlerFunc {
+// 	return func(c *gin.Context) {
 
-		logger.Info("http_request_start",
-			"request_id", c.GetString("RequestID"),
-			"method", c.Request.Method,
-			"user-agent", c.Request.UserAgent(),
-			"path", c.FullPath())
+// 		log := logger.With(
+// 			"service.name", "user_verification",
+// 			"@timestamp", time.Now().UTC().Format(time.RFC3339Nano),
+// 			"event.category", []string{"web"},
+// 			"http.request.method", c.Request.Method,
+// 			"http.request.path", c.FullPath(),
+// 			"http.request.agent", c.Request.UserAgent(),
+// 			"http.request.id", c.GetString("RequestID"),
+// 			"client.ip", c.ClientIP(),
+// 		)
 
-		c.Next()
-	}
-}
+// 		log.Info(
+// 			"http request started",
+// 			"event.action", "http.request",
+// 			"event.type", "start",
+// 		)
+
+// 		c.Next()
+// 	}
+// }
 
 func PanicRecoveryMiddleware(logger domain.LoggingRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		defer func() {
+			log := logger.With(
+				"service.name", "middleware_panic_recovery",
+				"@timestamp", time.Now().UTC().Format(time.RFC3339Nano),
+				"event.category", []string{"authentication", "web"},
+				"http.request.method", c.Request.Method,
+				"http.request.path", c.FullPath(),
+				"http.request.agent", c.Request.UserAgent(),
+				"http.request.id", observability.GetRequestID(c.Request.Context()),
+				"client.ip", c.ClientIP(),
+			)
 			if r := recover(); r != nil {
-				logger.Error("internal server error",
-					"request_id", c.GetString("RequestID"),
-					"method", c.Request.Method,
-					"path", c.FullPath(),
-					"reason", fmt.Sprintf("%v", r),
-					"stack", string(debug.Stack()),
+				log.Error(
+					"internal server error",
+					"error.message", fmt.Sprintf("%v", r),
+					"error.code", http.StatusInternalServerError,
+					"event.action", "middleware.panic_recovery",
+					"event.outcome", "failed",
+					"event.type", []string{"end", "error"},
 				)
 
-				httpErr := utils.HttpError{Message: "internal server error", Code: domain.ErrCodeInternal, StatusCode: http.StatusInternalServerError}
+				httpErr := dto.HttpError{Message: "internal server error", Code: domain.ErrCodeInternal, StatusCode: http.StatusInternalServerError}
 				c.AbortWithStatusJSON(httpErr.StatusCode, httpErr)
 			}
 		}()

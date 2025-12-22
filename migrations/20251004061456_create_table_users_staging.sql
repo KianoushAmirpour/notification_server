@@ -7,8 +7,8 @@ CREATE TABLE IF NOT EXISTS staging_users (
     email VARCHAR(256) NOT NULL UNIQUE,
     created_at TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
-    password VARCHAR(256),
-    preferences JSONB
+    password VARCHAR(256) NOT NULL, 
+    preferences JSONB NOT NULL
 
 )
 -- +goose StatementEnd

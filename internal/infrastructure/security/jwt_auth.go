@@ -27,7 +27,7 @@ func (j JwtAuth) CreateJWTToken(id int, email string) (*domain.TokenPair, error)
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    j.Issuer,
 			Subject:   "access-token",
-			ExpiresAt: jwt.NewNumericDate((time.Now().Add(time.Minute * 15))),
+			ExpiresAt: jwt.NewNumericDate((time.Now().Add(time.Minute * 60))),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
 		},
 	}

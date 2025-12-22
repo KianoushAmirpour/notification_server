@@ -57,4 +57,6 @@ var (
 	ErrInvalidJWTToken         = &DomainError{Code: ErrCodeUnauthorized, Message: "invalid jwt token", Cause: nil}
 	ErrInvalidJWTMethod        = &DomainError{Code: ErrCodeUnauthorized, Message: "invalid jwt method", Cause: nil}
 	ErrPersistRefreshToken     = &DomainError{Code: ErrCodePersisting, Message: "persisting refresh token failed", Cause: nil}
+	ErrStoryNotFound           = &DomainError{Code: ErrCodeNotFound, Message: "story not found", Cause: nil}
+	ErrNoMessageFound          = &DomainError{Code: ErrCodeNotFound, Message: "no message found in retry queue", Cause: nil}
 )
