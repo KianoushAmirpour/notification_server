@@ -100,7 +100,7 @@ Database: PostgreSQL
 OTP Store: Redis  
 Migrations: goose  
 Configuration: Viper  
-Rate Limiting: Token Bucket Algorithm and Redis
+Rate Limiting: Token Bucket Algorithm and Redis  
 Authentication: JWT Middleware  
 Logging: Slog  
 Email Service: Mailtrap SMTP  
