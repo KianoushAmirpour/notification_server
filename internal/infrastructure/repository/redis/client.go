@@ -23,7 +23,7 @@ func ConnectToRedis(addr string, database int) (*redis.Client, error) {
 		DB:   database,
 	})
 
-	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Minute*5)
+	ctx, cancelFunc := context.WithTimeout(context.Background(), time.Minute*1)
 	defer cancelFunc()
 
 	_, err := rdb.Ping(ctx).Result()

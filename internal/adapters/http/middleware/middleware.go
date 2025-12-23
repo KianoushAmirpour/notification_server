@@ -182,7 +182,7 @@ func CheckContentBody[T any](maxsize int) gin.HandlerFunc {
 	}
 }
 
-func RateLimiterMiddelware(ipratelimiter *IPRateLimiter, capacity, fillrate float64, logger domain.LoggingRepository) gin.HandlerFunc {
+func RateLimiterMiddelware(ipratelimiter *RedisRateLimiter, logger domain.LoggingRepository) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
 		log := logger.With(
@@ -208,9 +208,22 @@ func RateLimiterMiddelware(ipratelimiter *IPRateLimiter, capacity, fillrate floa
 			c.AbortWithStatusJSON(httpErr.StatusCode, httpErr)
 			return
 		}
-		rateLimiter := ipratelimiter.RequestRateLimiter(ip, capacity, fillrate)
-
-		if !rateLimiter.AllowRequest() {
+		// rateLimiter := ipratelimiter.RequestRateLimiter(ip, capacity, fillrate)
+		ok, err := ipratelimiter.AllowRequest(c, ip)
+		if err != nil {
+			log.Error(
+				"redis is not available",
+				"error.message", "Service Unavailable",
+				"error.code", http.StatusServiceUnavailable,
+				"event.action", "middleware.rate_limiter",
+				"event.outcome", "failed",
+				"event.type", []string{"end", "denied"},
+			)
+			httpErr := dto.HttpError{Message: "Rate Limit Exceeded", Code: domain.ErrCodeExternal, StatusCode: http.StatusServiceUnavailable}
+			c.AbortWithStatusJSON(httpErr.StatusCode, httpErr)
+			return
+		}
+		if !ok {
 			log.Error(
 				"rate limit exceeded",
 				"error.message", "rate limit exceeded",

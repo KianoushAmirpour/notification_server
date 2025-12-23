@@ -33,8 +33,6 @@ func SetupRoutes(config RouterConfig) *gin.Engine {
 		middleware.PanicRecoveryMiddleware(config.UserHandler.Logger),
 		middleware.RateLimiterMiddelware(
 			config.UserHandler.IpRateLimiter,
-			config.UserHandler.RateLimitCapacity,
-			config.UserHandler.RateLimitFillRate,
 			config.UserHandler.Logger),
 		// middleware.LoggingRequestMiddleware(config.UserHandler.Logger),
 	)

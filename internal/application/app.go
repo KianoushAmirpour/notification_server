@@ -66,7 +66,8 @@ func (a App) Run() {
 		FromEmail: a.Cfg.FromEmail,
 		Logger:    logger}
 
-	iplimiter := middleware.NewIpLimiter()
+	// iplimiter := middleware.NewIpLimiter()
+	redisRateLimier := middleware.NewRedisRateLimiter(redisConn, a.Cfg.RataLimitCapacity, a.Cfg.RataLimitFillRate, time.Hour)
 
 	UserRepo := postgres.NewUserRepo(dbPool)
 	UserVerificationRepo := postgres.NewUserVerificationRepo(dbPool)
@@ -125,7 +126,7 @@ func (a App) Run() {
 
 	storyScheduleService := usecase.NewStorySchedulerService(UserRepo, StoryRepo, storyGenerationTask, logger, a.Cfg.StoryGenerationStream)
 
-	h := handler.NewUserHandler(userRegisterSvc, storyScheduleService, iplimiter, jwttoken, logger,
+	h := handler.NewUserHandler(userRegisterSvc, storyScheduleService, redisRateLimier, jwttoken, logger,
 		a.Cfg.OTPExpiration, a.Cfg.JwtISS, a.Cfg.JwtAccessSecret, a.Cfg.JwtRefreshSecret, a.Cfg.RataLimitCapacity, a.Cfg.RataLimitFillRate,
 		a.Cfg.MaxAllowedSize)
 

@@ -137,7 +137,7 @@ func (s *UserService) RegisterUser(ctx context.Context, req domain.RegisteredUse
 
 	go func() {
 		otperr := s.OtpHandler.SaveOTP(timeoutCtx, req.Email, hashedOtp, otpExpiration)
-		if err != nil {
+		if otperr != nil {
 			otpErrChan <- otperr
 		}
 		close(otpErrChan)
@@ -159,7 +159,7 @@ func (s *UserService) RegisterUser(ctx context.Context, req domain.RegisteredUse
 			"event.action", "save_otp",
 			"event.type", []string{"error", "end"},
 			"event.outcome", "failed",
-			"error.message", err.Error())
+			"error.message", otperr.Error())
 		return nil, err
 	}
 
@@ -170,7 +170,7 @@ func (s *UserService) RegisterUser(ctx context.Context, req domain.RegisteredUse
 			"event.action", "send_verification_email",
 			"event.type", []string{"error", "end"},
 			"event.outcome", "failed",
-			"error.message", err.Error())
+			"error.message", emailerr.Error())
 		return nil, err
 	}
 

@@ -55,8 +55,8 @@ func NewWorkerPool(
 }
 
 func (wp *WorkerPool) Start() {
+	err := wp.TaskStreamHandler.CreateConsumerGroup(wp.Ctx, wp.Stream, wp.ConsumerGroup)
 	for i := 1; i <= wp.WorkerCounts; i++ {
-		err := wp.TaskStreamHandler.CreateConsumerGroup(wp.Ctx, wp.Stream, wp.ConsumerGroup)
 		if err != nil {
 			panic(err)
 		}

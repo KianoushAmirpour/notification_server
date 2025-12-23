@@ -16,24 +16,22 @@ import (
 )
 
 type UserHandler struct {
-	UserSvc           *usecase.UserService
-	ImageSvc          *usecase.StorySchedulerService
-	IpRateLimiter     *middleware.IPRateLimiter
-	JwtHandler        domain.JwtTokenRepository
-	Logger            domain.LoggingRepository
-	OtpExpiration     int
-	JwtIss            string
-	JwtSecret         string
-	JwtRefresh        string
-	RateLimitCapacity float64
-	RateLimitFillRate float64
-	MaxAllowedSize    int
+	UserSvc        *usecase.UserService
+	ImageSvc       *usecase.StorySchedulerService
+	IpRateLimiter  *middleware.RedisRateLimiter
+	JwtHandler     domain.JwtTokenRepository
+	Logger         domain.LoggingRepository
+	OtpExpiration  int
+	JwtIss         string
+	JwtSecret      string
+	JwtRefresh     string
+	MaxAllowedSize int
 }
 
 func NewUserHandler(
 	usersvc *usecase.UserService,
 	imgsvc *usecase.StorySchedulerService,
-	i *middleware.IPRateLimiter,
+	redisratelimiter *middleware.RedisRateLimiter,
 	auth domain.JwtTokenRepository,
 	logger domain.LoggingRepository,
 	otpexpiration int,
@@ -44,9 +42,9 @@ func NewUserHandler(
 	ratelimitfillrate float64,
 	maxallowedsize int,
 ) *UserHandler {
-	return &UserHandler{UserSvc: usersvc, ImageSvc: imgsvc, IpRateLimiter: i, JwtHandler: auth, Logger: logger,
+	return &UserHandler{UserSvc: usersvc, ImageSvc: imgsvc, IpRateLimiter: redisratelimiter, JwtHandler: auth, Logger: logger,
 		OtpExpiration: otpexpiration, JwtIss: jwtiss, JwtSecret: jwtsecret, JwtRefresh: jwtrefresh,
-		RateLimitCapacity: ratelimitcapacity, RateLimitFillRate: ratelimitfillrate, MaxAllowedSize: maxallowedsize}
+		MaxAllowedSize: maxallowedsize}
 }
 
 // HomePageHandler godoc
