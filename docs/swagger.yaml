@@ -79,7 +79,7 @@ definitions:
     - password
     - preferences
     type: object
-host: localhost:4000
+host: localhost:8000
 info:
   contact: {}
   description: REST API for notifications
